@@ -11,3 +11,5 @@ services:
         value: "20"
       - key: ANTHROPIC_API_KEY
         sync: false
+      - key: DB_PATH
+        value: "/tmp/inventory.db"

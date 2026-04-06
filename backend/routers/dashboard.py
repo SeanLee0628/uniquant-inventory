@@ -12,10 +12,10 @@ def dashboard_summary(month: Optional[str] = None):
     """KPI 요약. month=YYYY-MM이면 해당 월 출고 기준, 없으면 이번 달"""
     with get_db() as conn:
         r1 = conn.execute(
-            "SELECT COALESCE(SUM(amount_krw), 0) as v FROM datecode_inventory WHERE status = '사용가능'"
+            "SELECT COALESCE(SUM(amount_krw), 0) as v FROM datecode_inventory WHERE status = '사용가능' AND actual_stock > 0"
         ).fetchone()
         r5 = conn.execute(
-            "SELECT COUNT(*) as v FROM datecode_inventory WHERE urgency = 'critical' AND status = '사용가능'"
+            "SELECT COUNT(*) as v FROM datecode_inventory WHERE urgency = 'critical' AND status = '사용가능' AND actual_stock > 0"
         ).fetchone()
         # 선택 월 출고 (기본: 이번 달)
         target_month = month or ""
@@ -30,7 +30,7 @@ def dashboard_summary(month: Optional[str] = None):
             ).fetchone()
         # 노후 재고 금액
         r7 = conn.execute(
-            "SELECT COALESCE(SUM(amount_krw), 0) as v FROM datecode_inventory WHERE urgency = 'critical' AND status = '사용가능'"
+            "SELECT COALESCE(SUM(amount_krw), 0) as v FROM datecode_inventory WHERE urgency = 'critical' AND status = '사용가능' AND actual_stock > 0"
         ).fetchone()
         # 사용 가능한 월 목록
         months = conn.execute(
@@ -55,7 +55,7 @@ def vendor_value():
             """SELECT COALESCE(sr_number, '미분류') as vender,
                       SUM(amount_krw) as amount_krw
                FROM datecode_inventory
-               WHERE status = '사용가능'
+               WHERE status = '사용가능' AND actual_stock > 0
                GROUP BY sr_number
                ORDER BY amount_krw DESC"""
         ).fetchall()
@@ -117,7 +117,7 @@ def datecode_distribution():
             """SELECT SUBSTR(datecode, 1, 4) as year,
                       SUM(actual_stock) as quantity
                FROM datecode_inventory
-               WHERE status = '사용가능' AND datecode != '' AND datecode IS NOT NULL
+               WHERE status = '사용가능' AND actual_stock > 0 AND datecode != '' AND datecode IS NOT NULL
                GROUP BY year ORDER BY year ASC"""
         ).fetchall()
         return [{"year": r["year"], "quantity": r["quantity"] or 0} for r in rows]

@@ -54,7 +54,12 @@ BASE_SELECT = """
            pm.total_inbound, pm.total_outbound, pm.prev_month_balance,
            pm.customer as pm_customer
     FROM datecode_inventory di
-    LEFT JOIN product_master pm ON di.part_number = pm.part_number
+    LEFT JOIN (
+        SELECT part_number, family, vender, mobis_id, moq, unit, site, package, fab,
+               total_inbound, total_outbound, prev_month_balance, customer,
+               ROW_NUMBER() OVER (PARTITION BY part_number ORDER BY id DESC) as rn
+        FROM product_master
+    ) pm ON di.part_number = pm.part_number AND pm.rn = 1
 """
 
 
@@ -164,11 +169,15 @@ def list_inventory_grouped(
     order_col = sort_map.get(sort_by, "total_stock")
 
     with get_db() as conn:
+        pm_sub = """(SELECT part_number, family, vender, mobis_id, moq, site, customer,
+                     ROW_NUMBER() OVER (PARTITION BY part_number ORDER BY id DESC) as rn
+                     FROM product_master) pm ON di.part_number = pm.part_number AND pm.rn = 1"""
+
         count_row = conn.execute(
             f"""SELECT COUNT(*) as cnt FROM (
                 SELECT di.part_number
                 FROM datecode_inventory di
-                LEFT JOIN product_master pm ON di.part_number = pm.part_number
+                LEFT JOIN {pm_sub}
                 WHERE {where}
                 GROUP BY di.part_number
                 HAVING SUM(di.actual_stock) > 0
@@ -186,7 +195,7 @@ def list_inventory_grouped(
                        MAX(CASE WHEN di.actual_stock > 0 THEN {urgency_order} ELSE 0 END) as worst_urgency,
                        pm.family, pm.vender, pm.customer as pm_customer, pm.mobis_id, pm.moq, pm.site
                 FROM datecode_inventory di
-                LEFT JOIN product_master pm ON di.part_number = pm.part_number
+                LEFT JOIN {pm_sub}
                 WHERE {where}
                 GROUP BY di.part_number
                 HAVING SUM(di.actual_stock) > 0

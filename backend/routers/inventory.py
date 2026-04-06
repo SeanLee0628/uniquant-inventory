@@ -233,11 +233,11 @@ def get_part_lots(
     offset = (page - 1) * page_size
     with get_db() as conn:
         total_row = conn.execute(
-            "SELECT COUNT(*) as cnt FROM datecode_inventory WHERE part_number = ?",
+            "SELECT COUNT(*) as cnt FROM datecode_inventory WHERE part_number = ? AND actual_stock > 0",
             (part_number,),
         ).fetchone()
         rows = conn.execute(
-            f"""{BASE_SELECT} WHERE di.part_number = ?
+            f"""{BASE_SELECT} WHERE di.part_number = ? AND di.actual_stock > 0
                 ORDER BY di.actual_stock DESC
                 LIMIT ? OFFSET ?""",
             (part_number, page_size, offset),

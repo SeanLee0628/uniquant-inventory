@@ -1,9 +1,10 @@
 [phases.setup]
 nixPkgs = ["python312", "nodejs_20"]
+nixLibs = ["zlib"]
 
 [phases.install]
 cmds = [
-  "pip install -r backend/requirements.txt",
+  "python3.12 -m pip install -r backend/requirements.txt",
   "cd frontend && npm install"
 ]
 
@@ -11,4 +12,4 @@ cmds = [
 cmds = ["cd frontend && npm run build"]
 
 [start]
-cmd = "cd backend && uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}"
+cmd = "cd backend && python3.12 -m uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}"

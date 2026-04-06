@@ -165,10 +165,14 @@ def list_inventory_grouped(
 
     with get_db() as conn:
         count_row = conn.execute(
-            f"""SELECT COUNT(DISTINCT di.part_number) as cnt
+            f"""SELECT COUNT(*) as cnt FROM (
+                SELECT di.part_number
                 FROM datecode_inventory di
                 LEFT JOIN product_master pm ON di.part_number = pm.part_number
-                WHERE {where}""",
+                WHERE {where}
+                GROUP BY di.part_number
+                HAVING SUM(di.actual_stock) > 0
+            )""",
             params,
         ).fetchone()
 
@@ -185,6 +189,7 @@ def list_inventory_grouped(
                 LEFT JOIN product_master pm ON di.part_number = pm.part_number
                 WHERE {where}
                 GROUP BY di.part_number
+                HAVING SUM(di.actual_stock) > 0
                 ORDER BY {order_col} {sort_dir}
                 LIMIT ? OFFSET ?""",
             params + [page_size, offset],

@@ -179,11 +179,11 @@ def list_inventory_grouped(
         rows = conn.execute(
             f"""SELECT di.part_number,
                        SUM(di.actual_stock) as total_stock,
-                       SUM(di.out_quantity) as total_out_qty,
-                       COUNT(*) as lot_count,
-                       MAX(di.days_elapsed) as max_days,
-                       SUM(di.amount_krw) as total_krw,
-                       MAX({urgency_order}) as worst_urgency,
+                       SUM(CASE WHEN di.actual_stock > 0 THEN di.out_quantity ELSE 0 END) as total_out_qty,
+                       SUM(CASE WHEN di.actual_stock > 0 THEN 1 ELSE 0 END) as lot_count,
+                       MAX(CASE WHEN di.actual_stock > 0 THEN di.days_elapsed ELSE 0 END) as max_days,
+                       SUM(CASE WHEN di.actual_stock > 0 THEN di.amount_krw ELSE 0 END) as total_krw,
+                       MAX(CASE WHEN di.actual_stock > 0 THEN {urgency_order} ELSE 0 END) as worst_urgency,
                        pm.family, pm.vender, pm.customer as pm_customer, pm.mobis_id, pm.moq, pm.site
                 FROM datecode_inventory di
                 LEFT JOIN product_master pm ON di.part_number = pm.part_number

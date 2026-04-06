@@ -1,11 +1,19 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { getInventory } from '../api/client';
+import { getInventory, addInbound } from '../api/client';
 
 const urgencyLabel = { normal: '정상', warning: '주의', critical: '긴급' };
 const urgencyTooltip = {
   normal: '정상: DATECODE 기준 1년 미만 경과',
   warning: '주의: DATECODE 기준 1~2년 경과',
   critical: '긴급: DATECODE 기준 2년 초과',
+};
+
+const emptyForm = {
+  inbound_date: new Date().toISOString().slice(0, 10),
+  sr_number: '', part_number: '', quantity: '',
+  datecode: '', sales_person: '', customer: '',
+  po_number: '', remark: '',
+  unit_price_usd: '', exchange_rate: '',
 };
 
 export default function Datecode() {
@@ -18,6 +26,12 @@ export default function Datecode() {
     search: '', status: '', urgency: '',
     sort_by: 'di.id', sort_dir: 'desc',
   });
+
+  // 입고 폼
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({ ...emptyForm });
+  const [submitting, setSubmitting] = useState(false);
+  const [message, setMessage] = useState('');
 
   const load = useCallback(async () => {
     try {
@@ -50,12 +64,37 @@ export default function Datecode() {
     return filters.sort_dir === 'asc' ? ' ▲' : ' ▼';
   };
 
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setSubmitting(true);
+    setMessage('');
+    try {
+      const payload = {
+        ...form,
+        sales_team: team,
+        quantity: parseInt(form.quantity) || 0,
+        unit_price_usd: parseFloat(form.unit_price_usd) || 0,
+        exchange_rate: parseFloat(form.exchange_rate) || 0,
+      };
+      await addInbound(payload);
+      setMessage(`${form.part_number} ${form.quantity}개 입고 완료`);
+      setForm({ ...emptyForm, inbound_date: new Date().toISOString().slice(0, 10) });
+      load();
+    } catch (err) {
+      setMessage(err.response?.data?.detail || '입고 등록 실패');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const updateField = (field, value) => setForm(f => ({ ...f, [field]: value }));
+
   return (
     <div>
       <h1 className="page-title">📄 DATECODE 원장</h1>
 
-      {/* 영업실 탭 */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+      {/* 영업실 탭 + 입고 버튼 */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 16, alignItems: 'center' }}>
         {['영업1실', '영업2실'].map(t => (
           <button key={t}
             className={'btn btn-sm ' + (team === t ? 'btn-primary' : 'btn-outline')}
@@ -64,7 +103,89 @@ export default function Datecode() {
             {t}
           </button>
         ))}
+        <div className="spacer" />
+        <button className={'btn btn-sm ' + (showForm ? 'btn-danger' : 'btn-success')}
+          onClick={() => { setShowForm(!showForm); setMessage(''); }}>
+          {showForm ? '✕ 닫기' : '+ 입고 추가'}
+        </button>
       </div>
+
+      {/* 입고 폼 */}
+      {showForm && (
+        <div className="table-container" style={{ marginBottom: 16, padding: 16 }}>
+          <h3 style={{ margin: '0 0 12px' }}>📦 입고 등록 ({team})</h3>
+          <form onSubmit={handleSubmit}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
+              <label>
+                <span style={{ fontSize: 12, color: '#666' }}>입고일 *</span>
+                <input type="date" value={form.inbound_date} required
+                  onChange={e => updateField('inbound_date', e.target.value)} />
+              </label>
+              <label>
+                <span style={{ fontSize: 12, color: '#666' }}>Part# *</span>
+                <input value={form.part_number} required placeholder="Part#"
+                  onChange={e => updateField('part_number', e.target.value)} />
+              </label>
+              <label>
+                <span style={{ fontSize: 12, color: '#666' }}>수량 *</span>
+                <input type="number" value={form.quantity} required placeholder="수량" min="1"
+                  onChange={e => updateField('quantity', e.target.value)} />
+              </label>
+              <label>
+                <span style={{ fontSize: 12, color: '#666' }}>DATECODE</span>
+                <input value={form.datecode} placeholder="예: 202614"
+                  onChange={e => updateField('datecode', e.target.value)} />
+              </label>
+              <label>
+                <span style={{ fontSize: 12, color: '#666' }}>SR#</span>
+                <input value={form.sr_number} placeholder="SR#"
+                  onChange={e => updateField('sr_number', e.target.value)} />
+              </label>
+              <label>
+                <span style={{ fontSize: 12, color: '#666' }}>담당 SALES</span>
+                <input value={form.sales_person} placeholder="담당자"
+                  onChange={e => updateField('sales_person', e.target.value)} />
+              </label>
+              <label>
+                <span style={{ fontSize: 12, color: '#666' }}>CUSTOMER</span>
+                <input value={form.customer} placeholder="고객"
+                  onChange={e => updateField('customer', e.target.value)} />
+              </label>
+              <label>
+                <span style={{ fontSize: 12, color: '#666' }}>PO#</span>
+                <input value={form.po_number} placeholder="PO#"
+                  onChange={e => updateField('po_number', e.target.value)} />
+              </label>
+              <label>
+                <span style={{ fontSize: 12, color: '#666' }}>단가(USD)</span>
+                <input type="number" step="0.01" value={form.unit_price_usd} placeholder="0.00"
+                  onChange={e => updateField('unit_price_usd', e.target.value)} />
+              </label>
+              <label>
+                <span style={{ fontSize: 12, color: '#666' }}>환율</span>
+                <input type="number" step="0.01" value={form.exchange_rate} placeholder="1400.00"
+                  onChange={e => updateField('exchange_rate', e.target.value)} />
+              </label>
+              <label>
+                <span style={{ fontSize: 12, color: '#666' }}>REMARK</span>
+                <input value={form.remark} placeholder="비고"
+                  onChange={e => updateField('remark', e.target.value)} />
+              </label>
+              <label style={{ display: 'flex', alignItems: 'flex-end' }}>
+                <button type="submit" className="btn btn-primary" disabled={submitting}
+                  style={{ width: '100%' }}>
+                  {submitting ? '등록 중...' : '입고 등록'}
+                </button>
+              </label>
+            </div>
+          </form>
+          {message && (
+            <p style={{ marginTop: 8, fontSize: 13, color: message.includes('실패') ? '#e74c3c' : '#27ae60', fontWeight: 600 }}>
+              {message}
+            </p>
+          )}
+        </div>
+      )}
 
       <div className="table-container">
         <div className="table-toolbar">

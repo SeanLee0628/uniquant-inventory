@@ -317,12 +317,17 @@ def cancel_shipment(shipment_id: int):
                     exrate = dc_row["exchange_rate"] or 0
                     new_amt_usd = new_stock * unit_usd
                     new_amt_krw = new_amt_usd * exrate
+                    new_out_qty = max(0, (dc_row["actual_stock"] + restore_qty) - new_stock + restore_qty)
                     conn.execute(
                         """UPDATE datecode_inventory
                            SET actual_stock = ?, status = '사용가능',
-                               amount_usd = ?, amount_krw = ?
+                               amount_usd = ?, amount_krw = ?,
+                               out_quantity = MAX(0, COALESCE(out_quantity, 0) - ?),
+                               outbound_date = CASE WHEN COALESCE(out_quantity, 0) - ? <= 0 THEN '' ELSE outbound_date END,
+                               out_customer = CASE WHEN COALESCE(out_quantity, 0) - ? <= 0 THEN '' ELSE out_customer END,
+                               out_sales = CASE WHEN COALESCE(out_quantity, 0) - ? <= 0 THEN '' ELSE out_sales END
                            WHERE id = ?""",
-                        (new_stock, new_amt_usd, new_amt_krw, dc_id),
+                        (new_stock, new_amt_usd, new_amt_krw, restore_qty, restore_qty, restore_qty, restore_qty, dc_id),
                     )
                     restored.append({"datecode_id": dc_id, "restored_qty": restore_qty})
                     remaining -= restore_qty
@@ -350,9 +355,13 @@ def cancel_shipment(shipment_id: int):
                 conn.execute(
                     """UPDATE datecode_inventory
                        SET actual_stock = ?, status = '사용가능',
-                           amount_usd = ?, amount_krw = ?
+                           amount_usd = ?, amount_krw = ?,
+                           out_quantity = MAX(0, COALESCE(out_quantity, 0) - ?),
+                           outbound_date = CASE WHEN COALESCE(out_quantity, 0) - ? <= 0 THEN '' ELSE outbound_date END,
+                           out_customer = CASE WHEN COALESCE(out_quantity, 0) - ? <= 0 THEN '' ELSE out_customer END,
+                           out_sales = CASE WHEN COALESCE(out_quantity, 0) - ? <= 0 THEN '' ELSE out_sales END
                        WHERE id = ?""",
-                    (new_stock, new_stock * unit_usd, new_stock * unit_usd * exrate, lot["id"]),
+                    (new_stock, new_stock * unit_usd, new_stock * unit_usd * exrate, restore_qty, restore_qty, restore_qty, restore_qty, lot["id"]),
                 )
                 restored.append({"datecode_id": lot["id"], "restored_qty": restore_qty})
                 remaining -= restore_qty

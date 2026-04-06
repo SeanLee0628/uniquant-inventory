@@ -16,7 +16,7 @@ export default function Sidebar({ activePage, onNavigate, urgentCount }) {
     <div className="sidebar">
       <div className="sidebar-header">
         <h2>📡 유니퀀트</h2>
-        <p className="sidebar-subtitle">스마트 AI 재고관리</p>
+        <p className="sidebar-subtitle">The Future Logistics</p>
       </div>
       <nav className="sidebar-nav">
         {menuItems.map((item) => (
@@ -33,11 +33,6 @@ export default function Sidebar({ activePage, onNavigate, urgentCount }) {
 
       {/* 하단 영역 */}
       <div className="sidebar-bottom">
-        {urgentCount > 0 && (
-          <div className="urgent-badge" onClick={() => onNavigate('inventory')}>
-            🔴 긴급재고: {urgentCount}건
-          </div>
-        )}
         <div className="sidebar-contact">
           <div className="contact-label">문의</div>
           <div className="contact-name">경영기획팀 이희서 매니저</div>

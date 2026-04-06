@@ -7,7 +7,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from database import init_db
 from routers import upload, inventory, shipment, dashboard, export, chat, report
 
-app = FastAPI(title="반도체 부품 재고관리 시스템", version="1.0.0")
+app = FastAPI(title="The Future Logistics", version="1.0.0")
 
 app.add_middleware(
     CORSMiddleware,

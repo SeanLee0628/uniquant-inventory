@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { getShipments, getShipmentCount, exportShipmentsCsv, deleteShipment } from '../api/client';
+import { getShipments, getShipmentCount, exportShipmentsExcel, deleteShipment } from '../api/client';
 
 export default function ShipmentHistory() {
   const [items, setItems] = useState([]);
@@ -29,15 +29,15 @@ export default function ShipmentHistory() {
 
   const totalPages = Math.ceil(total / pageSize);
 
-  const handleExportCsv = async () => {
+  const handleExportExcel = async () => {
     try {
       const params = {};
       Object.entries(filters).forEach(([k, v]) => { if (v) params[k] = v; });
-      const res = await exportShipmentsCsv(params);
-      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const res = await exportShipmentsExcel(params);
+      const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
       const a = document.createElement('a');
       a.href = url;
-      a.download = 'shipments.csv';
+      a.download = 'shipping_management.xlsx';
       a.click();
       window.URL.revokeObjectURL(url);
     } catch {}
@@ -92,7 +92,7 @@ export default function ShipmentHistory() {
           <input placeholder="담당SALES" value={filters.sales_person}
             onChange={e => { setFilters(f => ({ ...f, sales_person: e.target.value })); setPage(1); }} />
           <div className="spacer" />
-          <button className="btn btn-sm btn-success" onClick={handleExportCsv}>CSV 다운로드</button>
+          <button className="btn btn-sm btn-success" onClick={handleExportExcel}>📥 엑셀 내보내기</button>
           <span style={{ fontSize: 13, color: '#888' }}>총 {total.toLocaleString()}건</span>
         </div>
 

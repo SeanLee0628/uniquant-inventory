@@ -125,6 +125,9 @@ async def upload_master(
     daily_count = 0
 
     with get_db() as conn:
+        # 기존 데이터 삭제 후 전체 재삽입 (원본 행 구조 유지)
+        conn.execute("DELETE FROM product_master")
+
         for row in data_rows:
             total += 1
             pn = safe_str(row[6]) if len(row) > 6 else ""  # G: Part#
@@ -138,11 +141,6 @@ async def upload_master(
 
             if current_qty > 0:
                 has_stock += 1
-
-            # UPSERT: 기존 있으면 업데이트, 없으면 삽입
-            existing = conn.execute(
-                "SELECT id FROM product_master WHERE part_number = ?", (pn,)
-            ).fetchone()
 
             params = (
                 safe_str(row[0]),   # A: Central
@@ -177,31 +175,17 @@ async def upload_master(
                 safe_int(row[29]) if len(row) > 29 else 0,  # AD: 전월
             )
 
-            if existing:
-                conn.execute("""
-                    UPDATE product_master SET
-                        central=?, sales_team=?, vender=?, sr_code=?, family=?, did=?,
-                        part_number=?, mobis_id=?, unit=?, site=?, moq=?, package=?, fab=?,
-                        current_qty=?, sales_person=?, customer=?, crd=?, booking=?, available_qty=?,
-                        dc_2019=?, dc_2020=?, dc_2021=?, dc_2022=?, dc_2023=?,
-                        dc_2024=?, dc_2025=?, dc_2026=?,
-                        total_inbound=?, total_outbound=?, prev_month_balance=?,
-                        updated_at=CURRENT_TIMESTAMP
-                    WHERE part_number=?
-                """, params + (pn,))
-                updated += 1
-            else:
-                conn.execute("""
-                    INSERT INTO product_master (
-                        central, sales_team, vender, sr_code, family, did,
-                        part_number, mobis_id, unit, site, moq, package, fab,
-                        current_qty, sales_person, customer, crd, booking, available_qty,
-                        dc_2019, dc_2020, dc_2021, dc_2022, dc_2023,
-                        dc_2024, dc_2025, dc_2026,
-                        total_inbound, total_outbound, prev_month_balance
-                    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-                """, params)
-                inserted += 1
+            conn.execute("""
+                INSERT INTO product_master (
+                    central, sales_team, vender, sr_code, family, did,
+                    part_number, mobis_id, unit, site, moq, package, fab,
+                    current_qty, sales_person, customer, crd, booking, available_qty,
+                    dc_2019, dc_2020, dc_2021, dc_2022, dc_2023,
+                    dc_2024, dc_2025, dc_2026,
+                    total_inbound, total_outbound, prev_month_balance
+                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            """, params)
+            inserted += 1
 
         # AE~CN 일별 입출고를 daily_inventory에 저장
         for row in data_rows:

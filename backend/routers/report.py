@@ -3,6 +3,7 @@
 from fastapi import APIRouter, HTTPException
 from database import get_db
 from dotenv import load_dotenv
+from datetime import date
 import anthropic
 import os
 import json
@@ -172,7 +173,14 @@ def generate_weekly_report():
 
     raw = _gather_report_data()
 
-    prompt = f"""아래는 반도체 부품 유통회사 창고의 이번 주 재고 데이터입니다.
+    today = date.today()
+    year = today.year
+    month = today.month
+    week = (today.day - 1) // 7 + 1
+    title = f"[{year}년 {month}월 {week}주차 자재팀 AI 리포트]"
+
+    prompt = f"""오늘 날짜는 {today.isoformat()}입니다.
+아래는 반도체 부품 유통회사 창고의 이번 주 재고 데이터입니다.
 이 데이터를 분석하여 경영진 보고용 주간 리포트를 작성해주세요.
 
 ## 원시 데이터
@@ -180,7 +188,7 @@ def generate_weekly_report():
 
 ## 리포트 형식 (반드시 이 형식 준수):
 
-[2026년 N월 N주차 자재팀 AI 리포트]
+{title}
 
 ⚠️ 긴급 조치 필요:
 - 긴급 재고 상위 항목들에 대해 구체적 품번, datecode, 수량, 경과기간을 명시
@@ -224,7 +232,9 @@ def detect_anomalies():
 
     raw = _gather_anomaly_data()
 
-    prompt = f"""아래는 반도체 부품 유통회사 창고의 이상 탐지용 데이터입니다.
+    today = date.today().isoformat()
+    prompt = f"""오늘 날짜는 {today}입니다.
+아래는 반도체 부품 유통회사 창고의 이상 탐지용 데이터입니다.
 각 카테고리를 분석하여 실제로 주의가 필요한 항목만 골라 경고 메시지를 생성해주세요.
 
 ## 원시 데이터

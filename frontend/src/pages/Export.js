@@ -1,9 +1,7 @@
 import React, { useState } from 'react';
-import { exportInventoryExcel, getWeeklyReport, getAnomalies } from '../api/client';
+import { getWeeklyReport, getAnomalies } from '../api/client';
 
 export default function Export() {
-  const [downloading, setDownloading] = useState(false);
-
   // 주간 리포트
   const [reportLoading, setReportLoading] = useState(false);
   const [reportText, setReportText] = useState('');
@@ -13,23 +11,6 @@ export default function Export() {
   const [anomalyLoading, setAnomalyLoading] = useState(false);
   const [anomalyText, setAnomalyText] = useState('');
   const [anomalyError, setAnomalyError] = useState('');
-
-  const handleExport = async () => {
-    setDownloading(true);
-    try {
-      const res = await exportInventoryExcel();
-      const url = window.URL.createObjectURL(new Blob([res.data]));
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'inventory_export.xlsx';
-      a.click();
-      window.URL.revokeObjectURL(url);
-    } catch {
-      alert('내보내기 중 오류가 발생했습니다.');
-    } finally {
-      setDownloading(false);
-    }
-  };
 
   const handleReport = async () => {
     setReportLoading(true);
@@ -121,18 +102,6 @@ export default function Export() {
         )}
       </div>
 
-      {/* 엑셀 내보내기 */}
-      <div className="insight-card">
-        <div className="insight-header">
-          <div>
-            <h3>📥 Mar inventory 엑셀 내보내기</h3>
-            <p className="insight-desc">기존 엑셀과 동일한 92열 양식으로 다운로드합니다. (A~S 마스터 + T~AA DC연도 + AB~AD 총입출고 + AE~CN 일별 입출고 31일×2)</p>
-          </div>
-          <button className="btn btn-success" onClick={handleExport} disabled={downloading}>
-            {downloading ? '다운로드 중...' : 'Mar inventory 다운로드'}
-          </button>
-        </div>
-      </div>
     </div>
   );
 }

@@ -14,7 +14,10 @@ export const getDatecodeDist = () => api.get('/dashboard/datecode-dist');
 
 // 재고
 export const getInventory = (params) => api.get('/inventory', { params });
+export const getInventoryGrouped = (params) => api.get('/inventory/grouped', { params });
+export const getPartLots = (pn, page = 1, pageSize = 10) => api.get('/inventory/lots/' + encodeURIComponent(pn), { params: { page, page_size: pageSize } });
 export const getUrgentInventory = (params) => api.get('/inventory/urgent', { params });
+export const addInbound = (data) => api.post('/inventory/inbound', data);
 export const getMoqAlerts = () => api.get('/inventory/moq-alerts');
 export const getPartDetail = (pn) => api.get('/inventory/' + encodeURIComponent(pn));
 export const getDailyInventory = (pn, ym) => api.get('/inventory/daily/' + encodeURIComponent(pn), { params: ym ? { year_month: ym } : {} });
@@ -49,8 +52,8 @@ export const uploadShipping = (file, overwrite = false) => {
 // 내보내기
 export const exportInventoryExcel = () =>
   api.get('/export/inventory', { responseType: 'blob' });
-export const exportShipmentsCsv = (params) =>
-  api.get('/export/shipments-csv', { params, responseType: 'blob' });
+export const exportShipmentsExcel = (params) =>
+  api.get('/export/shipments', { params, responseType: 'blob' });
 
 // AI 채팅
 export const sendChat = (message, history = []) =>

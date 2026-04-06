@@ -132,14 +132,14 @@ def export_inventory_excel(year_month: Optional[str] = None):
     )
 
 
-@router.get("/export/shipments-csv")
-def export_shipments_csv(
+@router.get("/export/shipments")
+def export_shipments_excel(
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
     customer: Optional[str] = None,
     part_number: Optional[str] = None,
 ):
-    """출고 이력 CSV 다운로드"""
+    """출고 이력 엑셀 다운로드"""
     conditions = []
     params = []
     if start_date:
@@ -157,24 +157,51 @@ def export_shipments_csv(
 
     where = " AND ".join(conditions) if conditions else "1=1"
 
-    buf = io.StringIO()
-    writer = csv.writer(buf)
-    writer.writerow(["DATE", "CUSTOMER", "PART#", "Q'ty", "SALES", "lot number", "DATECODE"])
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "shipping management"
+
+    hdr_fill = PatternFill(start_color="2B5797", end_color="2B5797", fill_type="solid")
+    hdr_font = Font(color="FFFFFF", bold=True, size=10)
+    thin = Border(
+        left=Side(style="thin"), right=Side(style="thin"),
+        top=Side(style="thin"), bottom=Side(style="thin"),
+    )
+
+    headers = ["DATE", "CUSTOMER", "PART#", "Q'ty", "SALES", "lot number", "DATECODE"]
+    for col, h in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col, value=h)
+        cell.fill = hdr_fill
+        cell.font = hdr_font
+        cell.alignment = Alignment(horizontal="center")
+        cell.border = thin
 
     with get_db() as conn:
         rows = conn.execute(
             f"SELECT * FROM shipment_log WHERE {where} ORDER BY ship_date DESC",
             params,
         ).fetchall()
-        for r in rows:
-            writer.writerow([
+        for i, r in enumerate(rows, 2):
+            values = [
                 r["ship_date"], r["customer"], r["part_number"],
                 r["quantity"], r["sales_person"], r["lot_number"], r["datecode"],
-            ])
+            ]
+            for col, val in enumerate(values, 1):
+                cell = ws.cell(row=i, column=col, value=val)
+                cell.border = thin
 
+    widths = {1: 12, 2: 20, 3: 30, 4: 12, 5: 10, 6: 15, 7: 12}
+    for c, w in widths.items():
+        ws.column_dimensions[get_column_letter(c)].width = w
+
+    ws.freeze_panes = "A2"
+
+    buf = io.BytesIO()
+    wb.save(buf)
     buf.seek(0)
+
     return StreamingResponse(
-        iter([buf.getvalue()]),
-        media_type="text/csv",
-        headers={"Content-Disposition": "attachment; filename=shipping_management.csv"},
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=\"shipping_management.xlsx\""},
     )

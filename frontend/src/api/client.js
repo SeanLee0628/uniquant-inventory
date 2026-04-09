@@ -36,12 +36,12 @@ export const deleteShipment = (id) => api.delete('/shipments/' + id);
 export const uploadDatecode = (file, overwrite = false) => {
   const form = new FormData();
   form.append('file', file);
-  return api.post(`/upload/datecode?overwrite=${overwrite}`, form);
+  return api.post(`/upload/datecode?overwrite=${overwrite}`, form, { timeout: 120000 });
 };
 export const uploadProductMaster = (file) => {
   const form = new FormData();
   form.append('file', file);
-  return api.post('/upload/master', form);
+  return api.post('/upload/master', form, { timeout: 120000 });
 };
 export const checkExisting = () => api.get('/upload/check-existing');
 export const uploadShipping = (file, overwrite = false) => {

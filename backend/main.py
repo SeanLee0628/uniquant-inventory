@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 from database import init_db
-from routers import upload, inventory, shipment, dashboard, export, chat, report
+from routers import upload, inventory, shipment, dashboard, export, chat, report, ledger, manual_entry
 
 app = FastAPI(title="The Future Logistics", version="1.0.0")
 
@@ -25,6 +25,8 @@ app.include_router(dashboard.router, prefix="/api", tags=["대시보드"])
 app.include_router(export.router, prefix="/api", tags=["내보내기"])
 app.include_router(chat.router, prefix="/api", tags=["AI 채팅"])
 app.include_router(report.router, prefix="/api", tags=["AI 리포트"])
+app.include_router(ledger.router, prefix="/api", tags=["수불부"])
+app.include_router(manual_entry.router, prefix="/api", tags=["수동입력"])
 
 
 @app.get("/api/health")

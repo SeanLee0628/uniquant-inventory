@@ -1,5 +1,5 @@
-import React, { useState, useRef } from 'react';
-import { uploadDatecode, uploadProductMaster, uploadShipping, checkExisting } from '../api/client';
+import React, { useState, useRef, useEffect } from 'react';
+import { uploadDatecode, uploadProductMaster, uploadShipping, checkExisting, createManualEntry, getTodayEntries } from '../api/client';
 
 export default function Upload() {
   const [dragover, setDragover] = useState(false);
@@ -13,7 +13,43 @@ export default function Upload() {
   const [shippingResult, setShippingResult] = useState(null);
   const fileRef = useRef(null);
 
-  const resetResults = () => { setResults(null); setMasterResult(null); setShippingResult(null); setError(''); };
+  // 수기입력 상태
+  const [manualForm, setManualForm] = useState({
+    inbound_date: new Date().toISOString().slice(0, 10),
+    sr_number: '', part_number: '', quantity: '', datecode: '', sales_person: '', customer: '',
+  });
+  const [autoDate, setAutoDate] = useState(true);
+  const [manualLoading, setManualLoading] = useState(false);
+  const [manualSuccess, setManualSuccess] = useState('');
+  const [manualError, setManualError] = useState('');
+  const [todayEntries, setTodayEntries] = useState([]);
+
+  const loadToday = () => { getTodayEntries().then(r => setTodayEntries(r.data)).catch(() => {}); };
+  useEffect(() => { if (uploadType === 'manual') loadToday(); }, [uploadType]);
+
+  const handleManualChange = (field, value) => setManualForm(f => ({ ...f, [field]: value }));
+
+  const handleManualSubmit = async (e) => {
+    e.preventDefault();
+    setManualError(''); setManualSuccess('');
+    if (!manualForm.part_number.trim()) { setManualError('Part#는 필수입니다.'); return; }
+    const qty = parseInt(manualForm.quantity, 10);
+    if (isNaN(qty) || qty <= 0) { setManualError('수량은 1 이상이어야 합니다.'); return; }
+    if (!manualForm.inbound_date) { setManualError('입고날짜를 입력해주세요.'); return; }
+    setManualLoading(true);
+    try {
+      const res = await createManualEntry({ ...manualForm, quantity: qty });
+      setManualSuccess(`✅ ${res.data.message} (ID: ${res.data.id})`);
+      setManualForm(f => ({
+        inbound_date: autoDate ? new Date().toISOString().slice(0, 10) : f.inbound_date,
+        sr_number: '', part_number: '', quantity: '', datecode: '', sales_person: '', customer: '',
+      }));
+      loadToday();
+    } catch (err) { setManualError(err.response?.data?.detail || '등록 중 오류'); }
+    finally { setManualLoading(false); }
+  };
+
+  const resetResults = () => { setResults(null); setMasterResult(null); setShippingResult(null); setError(''); setManualSuccess(''); setManualError(''); };
 
   const handleFile = async (file) => {
     if (!file) return;
@@ -66,6 +102,7 @@ export default function Upload() {
   const onDrop = (e) => { e.preventDefault(); setDragover(false); handleFile(e.dataTransfer.files[0]); };
 
   const typeLabels = {
+    manual: { name: 'Datecode 추가', icon: '📝', hint: '입고 데이터 직접 입력' },
     datecode: { name: 'DATECODE', icon: '📄', hint: '영업1실/영업2실 자동 감지' },
     master: { name: 'Mar inventory', icon: '📊', hint: '헤더 2행, 데이터 3행부터. Part# UPSERT' },
     shipping: { name: 'Shipping management', icon: '🚚', hint: '기존 출고 이력 일괄 임포트 (73,000건+)' },
@@ -87,19 +124,114 @@ export default function Upload() {
         ))}
       </div>
 
-      <div
-        className={'dropzone' + (dragover ? ' dragover' : '')}
-        onDragOver={(e) => { e.preventDefault(); setDragover(true); }}
-        onDragLeave={() => setDragover(false)}
-        onDrop={onDrop}
-        onClick={() => fileRef.current?.click()}
-      >
-        <div className="icon">{cur.icon}</div>
-        <p>{uploading ? '업로드 중... (대용량은 1~2분 소요)' : cur.name + ' 파일을 드래그 앤 드롭하세요'}</p>
-        <p className="hint">.xlsx 파일 | {cur.hint}</p>
-        <input ref={fileRef} type="file" accept=".xlsx,.xls" style={{ display: 'none' }}
-          onChange={e => handleFile(e.target.files[0])} />
-      </div>
+      {uploadType !== 'manual' ? (
+        <div
+          className={'dropzone' + (dragover ? ' dragover' : '')}
+          onDragOver={(e) => { e.preventDefault(); setDragover(true); }}
+          onDragLeave={() => setDragover(false)}
+          onDrop={onDrop}
+          onClick={() => fileRef.current?.click()}
+        >
+          <div className="icon">{cur.icon}</div>
+          <p>{uploading ? '업로드 중... (대용량은 1~2분 소요)' : cur.name + ' 파일을 드래그 앤 드롭하세요'}</p>
+          <p className="hint">.xlsx 파일 | {cur.hint}</p>
+          <input ref={fileRef} type="file" accept=".xlsx,.xls" style={{ display: 'none' }}
+            onChange={e => handleFile(e.target.files[0])} />
+        </div>
+      ) : (
+        <div className="form-card">
+          <form onSubmit={handleManualSubmit}>
+            <div className="form-row">
+              <div className="form-group">
+                <label>입고날짜 *</label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <input type="date" value={manualForm.inbound_date}
+                    disabled={autoDate}
+                    onChange={e => handleManualChange('inbound_date', e.target.value)}
+                    style={autoDate ? { opacity: 0.7 } : {}} />
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                    <input type="checkbox" checked={autoDate} onChange={() => {
+                      const next = !autoDate;
+                      setAutoDate(next);
+                      if (next) setManualForm(f => ({ ...f, inbound_date: new Date().toISOString().slice(0, 10) }));
+                    }} />
+                    오늘
+                  </label>
+                </div>
+              </div>
+              <div className="form-group">
+                <label>SR#</label>
+                <input value={manualForm.sr_number} placeholder="SR 번호"
+                  onChange={e => handleManualChange('sr_number', e.target.value)} />
+              </div>
+            </div>
+            <div className="form-row">
+              <div className="form-group">
+                <label>Part# *</label>
+                <input value={manualForm.part_number} placeholder="Part# 입력"
+                  onChange={e => handleManualChange('part_number', e.target.value)} />
+              </div>
+              <div className="form-group">
+                <label>Q'ty *</label>
+                <input type="number" min="1" value={manualForm.quantity} placeholder="수량"
+                  onChange={e => handleManualChange('quantity', e.target.value)} />
+              </div>
+            </div>
+            <div className="form-row">
+              <div className="form-group">
+                <label>Datecode</label>
+                <input value={manualForm.datecode} placeholder="예: 202538 (YYYYWW)"
+                  onChange={e => handleManualChange('datecode', e.target.value)} />
+              </div>
+              <div className="form-group">
+                <label>담당 Sales</label>
+                <input value={manualForm.sales_person} placeholder="담당자명"
+                  onChange={e => handleManualChange('sales_person', e.target.value)} />
+              </div>
+            </div>
+            <div className="form-row">
+              <div className="form-group">
+                <label>Customer</label>
+                <input value={manualForm.customer} placeholder="고객명"
+                  onChange={e => handleManualChange('customer', e.target.value)} />
+              </div>
+              <div className="form-group" />
+            </div>
+            {manualError && <div style={{ color: '#ff4757', marginBottom: 16, fontWeight: 600 }}>{manualError}</div>}
+            {manualSuccess && <div style={{ color: '#2e7d32', marginBottom: 16, fontWeight: 600 }}>{manualSuccess}</div>}
+            <button type="submit" className="btn btn-primary" disabled={manualLoading}>
+              {manualLoading ? '등록 중...' : '입고 등록'}
+            </button>
+          </form>
+
+          {todayEntries.length > 0 && (
+            <div style={{ marginTop: 24 }}>
+              <h4 style={{ marginBottom: 8 }}>오늘 입고 내역 ({todayEntries.length}건)</h4>
+              <div style={{ overflowX: 'auto' }}>
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>SR#</th><th>Part#</th><th>Q'ty</th><th>Datecode</th><th>Sales</th><th>Customer</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {todayEntries.map(r => (
+                      <tr key={r.id}>
+                        <td>{r.sr_number || '-'}</td>
+                        <td style={{ fontWeight: 600 }}>{r.part_number}</td>
+                        <td style={{ textAlign: 'right' }}>{(r.quantity || 0).toLocaleString()}</td>
+                        <td>{r.datecode || '-'}</td>
+                        <td>{r.sales_person || '-'}</td>
+                        <td>{r.customer || '-'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {error && <div style={{ color: '#ff4757', marginTop: 16, fontWeight: 600 }}>{error}</div>}
 

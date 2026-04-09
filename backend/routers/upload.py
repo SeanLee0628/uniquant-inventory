@@ -208,6 +208,44 @@ async def upload_master(
                     )
                     daily_count += 1
 
+        # monthly_ledger에 전기이월/당기입고/당기출고/기말재고 저장
+        conn.execute("DELETE FROM monthly_ledger WHERE year_month = ?", (year_month,))
+        ledger_count = 0
+        for row in data_rows:
+            pn = safe_str(row[6]) if len(row) > 6 else ""
+            if not pn:
+                continue
+            prev = safe_int(row[29]) if len(row) > 29 else 0   # AD: 전월잔고
+            cur = safe_int(row[13]) if len(row) > 13 else 0    # N: 현재고
+            bk = safe_int(row[17]) if len(row) > 17 else 0     # R: booking
+            avail = safe_int(row[18]) if len(row) > 18 else (cur - bk)
+
+            # 당월 입고/출고 합 (일별 데이터에서)
+            m_in = sum(safe_int(row[c]) for c in range(30, min(61, len(row))))
+            m_out = sum(safe_int(row[c]) for c in range(61, min(92, len(row))))
+
+            if prev > 0 or m_in > 0 or m_out > 0 or cur > 0:
+                conn.execute(
+                    """INSERT INTO monthly_ledger
+                       (year_month, part_number, family, vender, customer,
+                        prev_balance, month_inbound, month_outbound, end_balance,
+                        booking, available_qty)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                       ON CONFLICT(year_month, part_number)
+                       DO UPDATE SET prev_balance=excluded.prev_balance,
+                                     month_inbound=excluded.month_inbound,
+                                     month_outbound=excluded.month_outbound,
+                                     end_balance=excluded.end_balance,
+                                     booking=excluded.booking,
+                                     available_qty=excluded.available_qty""",
+                    (year_month, pn,
+                     safe_str(row[4]) if len(row) > 4 else "",
+                     safe_str(row[2]) if len(row) > 2 else "",
+                     safe_str(row[15]) if len(row) > 15 else "",
+                     prev, m_in, m_out, cur, bk, avail),
+                )
+                ledger_count += 1
+
     return {
         "total": total,
         "inserted": inserted,
@@ -215,6 +253,7 @@ async def upload_master(
         "errors": errors,
         "has_stock": has_stock,
         "daily_imported": daily_count,
+        "ledger_imported": ledger_count,
         "year_month": year_month,
     }
 

@@ -121,6 +121,27 @@ def init_db():
                 UNIQUE(part_number, year_month, day)
             );
 
+            -- 월별 수불 스냅샷 (매월 업로드 시 저장)
+            CREATE TABLE IF NOT EXISTS monthly_ledger (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                year_month TEXT NOT NULL,
+                part_number TEXT NOT NULL,
+                family TEXT,
+                vender TEXT,
+                customer TEXT,
+                prev_balance INTEGER DEFAULT 0,
+                month_inbound INTEGER DEFAULT 0,
+                month_outbound INTEGER DEFAULT 0,
+                end_balance INTEGER DEFAULT 0,
+                booking INTEGER DEFAULT 0,
+                available_qty INTEGER DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(year_month, part_number)
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_monthly_ym ON monthly_ledger(year_month);
+            CREATE INDEX IF NOT EXISTS idx_monthly_part ON monthly_ledger(part_number);
+
             CREATE INDEX IF NOT EXISTS idx_datecode_part ON datecode_inventory(part_number);
             CREATE INDEX IF NOT EXISTS idx_datecode_status ON datecode_inventory(status);
             CREATE INDEX IF NOT EXISTS idx_datecode_urgency ON datecode_inventory(urgency);

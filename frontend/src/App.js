@@ -9,6 +9,7 @@ import Upload from './pages/Upload';
 import Export from './pages/Export';
 import Datecode from './pages/Datecode';
 import Chat from './pages/Chat';
+import Ledger from './pages/Ledger';
 import { getDashboardSummary, getMoqAlerts } from './api/client';
 
 const pages = {
@@ -20,6 +21,7 @@ const pages = {
   upload: Upload,
   export: Export,
   chat: Chat,
+  ledger: Ledger,
 };
 
 export default function App() {

@@ -181,15 +181,40 @@ export default function Inventory() {
           <table>
             <thead>
               <tr>
-                <th>Part#</th>
-                <th>FAMILY</th>
+                <th>Central</th>
+                <th>Sales team</th>
                 <th>VENDER</th>
-                <th>CUSTOMER</th>
-                <th>총 실재고</th>
-                <th>총 출고</th>
-                <th>로트 수</th>
-                <th>최대 경과일</th>
+                <th>SR#</th>
+                <th>FAMILY</th>
+                <th>DID#</th>
+                <th>Part#</th>
+                <th>MOBIS ID</th>
+                <th>unit</th>
+                <th>site</th>
                 <th>MOQ</th>
+                <th>Package</th>
+                <th>FAB</th>
+                <th style={{ cursor: 'pointer' }} onClick={() => handleSort('total_stock')}>Q'ty{sortIcon('total_stock')}</th>
+                <th>SALES</th>
+                <th>CUSTOMER</th>
+                <th>CRD</th>
+                <th>booking</th>
+                <th>available</th>
+                <th>DC 2019</th>
+                <th>DC 2020</th>
+                <th>DC 2021</th>
+                <th>DC 2022</th>
+                <th>DC 2023</th>
+                <th>DC 2024</th>
+                <th>DC 2025</th>
+                <th>DC 2026</th>
+                <th>총입고</th>
+                <th>총출고</th>
+                <th>전월</th>
+                <th>실재고</th>
+                <th>출고합</th>
+                <th>로트</th>
+                <th style={{ cursor: 'pointer' }} onClick={() => handleSort('max_days')}>경과일{sortIcon('max_days')}</th>
                 <th>금액(KRW)</th>
                 <th>노후도</th>
               </tr>
@@ -201,17 +226,42 @@ export default function Inventory() {
                   <tr className={'urgency-' + row.worst_urgency}
                       style={{ cursor: 'pointer' }}
                       onClick={() => togglePn(row.part_number)}>
-                    <td style={{ fontWeight: 600 }}>
+                    <td>{row.central || '-'}</td>
+                    <td>{row.sales_team || '-'}</td>
+                    <td>{row.vender}</td>
+                    <td>{row.sr_code || '-'}</td>
+                    <td>{row.family}</td>
+                    <td>{row.did || '-'}</td>
+                    <td style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>
                       {expandedPn === row.part_number ? '▼ ' : '▶ '}{row.part_number}
                     </td>
-                    <td>{row.family}</td>
-                    <td>{row.vender}</td>
+                    <td>{row.mobis_id || '-'}</td>
+                    <td>{row.unit || '-'}</td>
+                    <td>{row.site || '-'}</td>
+                    <td style={{ textAlign: 'right' }}>{row.moq ? row.moq.toLocaleString() : '-'}</td>
+                    <td>{row.package || '-'}</td>
+                    <td>{row.fab || '-'}</td>
+                    <td style={{ textAlign: 'right', fontWeight: 700 }}>{row.current_qty ? row.current_qty.toLocaleString() : '-'}</td>
+                    <td>{row.sales_person || '-'}</td>
                     <td>{row.customer}</td>
+                    <td>{row.crd || '-'}</td>
+                    <td style={{ textAlign: 'right' }}>{row.booking ? row.booking.toLocaleString() : '-'}</td>
+                    <td style={{ textAlign: 'right' }}>{row.available_qty ? row.available_qty.toLocaleString() : '-'}</td>
+                    <td style={{ textAlign: 'right' }}>{row.dc_2019 || '-'}</td>
+                    <td style={{ textAlign: 'right' }}>{row.dc_2020 || '-'}</td>
+                    <td style={{ textAlign: 'right' }}>{row.dc_2021 || '-'}</td>
+                    <td style={{ textAlign: 'right' }}>{row.dc_2022 || '-'}</td>
+                    <td style={{ textAlign: 'right' }}>{row.dc_2023 || '-'}</td>
+                    <td style={{ textAlign: 'right' }}>{row.dc_2024 || '-'}</td>
+                    <td style={{ textAlign: 'right' }}>{row.dc_2025 || '-'}</td>
+                    <td style={{ textAlign: 'right' }}>{row.dc_2026 || '-'}</td>
+                    <td style={{ textAlign: 'right' }}>{row.total_inbound ? row.total_inbound.toLocaleString() : '-'}</td>
+                    <td style={{ textAlign: 'right' }}>{row.total_outbound ? row.total_outbound.toLocaleString() : '-'}</td>
+                    <td style={{ textAlign: 'right' }}>{row.prev_month_balance ? row.prev_month_balance.toLocaleString() : '-'}</td>
                     <td style={{ textAlign: 'right', fontWeight: 700 }}>{row.total_stock.toLocaleString()}</td>
                     <td style={{ textAlign: 'right' }}>{row.total_out_qty ? row.total_out_qty.toLocaleString() : '-'}</td>
                     <td style={{ textAlign: 'center' }}>{row.lot_count}</td>
                     <td style={{ textAlign: 'right' }}>{row.max_days.toLocaleString()}일</td>
-                    <td style={{ textAlign: 'right' }}>{row.moq ? row.moq.toLocaleString() : '-'}</td>
                     <td style={{ textAlign: 'right' }}>{row.total_krw ? '₩' + row.total_krw.toLocaleString() : '-'}</td>
                     <td><span className={'urgency-tag ' + row.worst_urgency} title={urgencyTooltip[row.worst_urgency]}>{urgencyLabel[row.worst_urgency]}</span></td>
                   </tr>
@@ -219,7 +269,7 @@ export default function Inventory() {
                   {/* 로트 목록 (Part# 펼침) */}
                   {expandedPn === row.part_number && (
                     <tr>
-                      <td colSpan={11} style={{ padding: 0, background: '#f8f9fa' }}>
+                      <td colSpan={36} style={{ padding: 0, background: '#f8f9fa' }}>
                         <div style={{ padding: '8px 12px' }}>
                           <h4 style={{ margin: '0 0 8px' }}>📋 {row.part_number} — DATECODE 로트 ({lotsTotal}건)</h4>
                           {lotsLoading ? (
@@ -266,7 +316,7 @@ export default function Inventory() {
                                       {/* 달력 (로트 펼침) */}
                                       {expandedLotId === lot.id && lotDaily && (
                                         <tr>
-                                          <td colSpan={12} style={{ padding: 0 }}>
+                                          <td colSpan={36} style={{ padding: 0 }}>
                                             <div className="daily-panel">
                                               <div className="daily-header">
                                                 <h4>📅 입출고 내역</h4>
@@ -340,7 +390,7 @@ export default function Inventory() {
                 </React.Fragment>
               ))}
               {items.length === 0 && (
-                <tr><td colSpan={11} style={{ textAlign: 'center', padding: 40, color: '#aaa' }}>데이터가 없습니다</td></tr>
+                <tr><td colSpan={36} style={{ textAlign: 'center', padding: 40, color: '#aaa' }}>데이터가 없습니다</td></tr>
               )}
             </tbody>
           </table>

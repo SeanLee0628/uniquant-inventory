@@ -25,6 +25,7 @@ export const getDailyInventory = (pn, ym) => api.get('/inventory/daily/' + encod
 // 출고
 export const searchParts = (q) => api.get('/parts/search', { params: { q } });
 export const getPartStock = (partNumber) => api.get('/parts/stock', { params: { part_number: partNumber } });
+export const getPartLotsForShipment = (partNumber) => api.get('/parts/lots', { params: { part_number: partNumber } });
 export const createShipment = (data) => api.post('/shipment', data);
 export const getShipments = (params) => api.get('/shipments', { params });
 export const getShipmentCount = (params) => api.get('/shipments/count', { params });
@@ -58,6 +59,16 @@ export const exportShipmentsExcel = (params) =>
 // AI 채팅
 export const sendChat = (message, history = []) =>
   api.post('/chat', { message, history }, { timeout: 60000 });
+
+// 수불부
+export const getLedger = (params) => api.get('/ledger', { params });
+export const exportLedgerExcel = () => api.get('/export/ledger', { responseType: 'blob' });
+export const getLedgerDetail = (pn) => api.get('/ledger/detail/' + encodeURIComponent(pn));
+
+// 수동 입력
+export const createManualEntry = (data) => api.post('/manual-entry', data);
+export const getRecentEntries = (limit = 20) => api.get('/manual-entry/recent', { params: { limit } });
+export const getTodayEntries = () => api.get('/manual-entry/today');
 
 // AI 리포트 / 이상 탐지
 export const getWeeklyReport = () => api.get('/report/weekly', { timeout: 60000 });

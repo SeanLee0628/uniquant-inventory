@@ -169,7 +169,11 @@ def list_inventory_grouped(
     order_col = sort_map.get(sort_by, "total_stock")
 
     with get_db() as conn:
-        pm_sub = """(SELECT part_number, family, vender, mobis_id, moq, site, customer,
+        pm_sub = """(SELECT part_number, central, sales_team as pm_sales_team, family, vender,
+                     sr_code, did, mobis_id, unit, site, moq, package, fab,
+                     current_qty, sales_person as pm_sales, customer, crd, booking, available_qty,
+                     dc_2019, dc_2020, dc_2021, dc_2022, dc_2023, dc_2024, dc_2025, dc_2026,
+                     total_inbound, total_outbound, prev_month_balance,
                      ROW_NUMBER() OVER (PARTITION BY part_number ORDER BY id DESC) as rn
                      FROM product_master) pm ON di.part_number = pm.part_number AND pm.rn = 1"""
 
@@ -193,7 +197,12 @@ def list_inventory_grouped(
                        MAX(CASE WHEN di.actual_stock > 0 THEN di.days_elapsed ELSE 0 END) as max_days,
                        SUM(CASE WHEN di.actual_stock > 0 THEN di.amount_krw ELSE 0 END) as total_krw,
                        MAX(CASE WHEN di.actual_stock > 0 THEN {urgency_order} ELSE 0 END) as worst_urgency,
-                       pm.family, pm.vender, pm.customer as pm_customer, pm.mobis_id, pm.moq, pm.site
+                       pm.central, pm.pm_sales_team, pm.family, pm.vender, pm.sr_code, pm.did,
+                       pm.customer as pm_customer, pm.mobis_id, pm.unit, pm.site, pm.moq, pm.package, pm.fab,
+                       pm.current_qty, pm.pm_sales, pm.crd, pm.booking, pm.available_qty,
+                       pm.dc_2019, pm.dc_2020, pm.dc_2021, pm.dc_2022, pm.dc_2023,
+                       pm.dc_2024, pm.dc_2025, pm.dc_2026,
+                       pm.total_inbound, pm.total_outbound, pm.prev_month_balance
                 FROM datecode_inventory di
                 LEFT JOIN {pm_sub}
                 WHERE {where}
@@ -216,12 +225,35 @@ def list_inventory_grouped(
                 "max_days": r["max_days"] or 0,
                 "total_krw": r["total_krw"] or 0,
                 "worst_urgency": urgency_str,
+                "central": r["central"] or "",
+                "sales_team": r["pm_sales_team"] or "",
                 "family": r["family"] or "",
                 "vender": r["vender"] or "",
+                "sr_code": r["sr_code"] or "",
+                "did": r["did"] or "",
                 "customer": r["pm_customer"] or "",
                 "mobis_id": r["mobis_id"] or "",
-                "moq": r["moq"] or 0,
+                "unit": r["unit"] or "",
                 "site": r["site"] or "",
+                "moq": r["moq"] or 0,
+                "package": r["package"] or "",
+                "fab": r["fab"] or "",
+                "current_qty": r["current_qty"] or 0,
+                "sales_person": r["pm_sales"] or "",
+                "crd": r["crd"] or "",
+                "booking": r["booking"] or 0,
+                "available_qty": r["available_qty"] or 0,
+                "dc_2019": r["dc_2019"] or 0,
+                "dc_2020": r["dc_2020"] or 0,
+                "dc_2021": r["dc_2021"] or 0,
+                "dc_2022": r["dc_2022"] or 0,
+                "dc_2023": r["dc_2023"] or 0,
+                "dc_2024": r["dc_2024"] or 0,
+                "dc_2025": r["dc_2025"] or 0,
+                "dc_2026": r["dc_2026"] or 0,
+                "total_inbound": r["total_inbound"] or 0,
+                "total_outbound": r["total_outbound"] or 0,
+                "prev_month_balance": r["prev_month_balance"] or 0,
             })
 
         return {

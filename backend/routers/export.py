@@ -205,3 +205,208 @@ def export_shipments_excel(
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": "attachment; filename=\"shipping_management.xlsx\""},
     )
+
+
+@router.get("/export/ledger")
+def export_ledger_excel():
+    """수불부 엑셀 내보내기 — 상품수불명세서 형태"""
+    YEAR_MONTH = "2026-03"
+    YEAR_START = "2026-01"
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "상품수불명세서"
+
+    # 스타일
+    hdr_fill_green = PatternFill(start_color="C8E6C9", end_color="C8E6C9", fill_type="solid")
+    hdr_fill_red = PatternFill(start_color="FFCDD2", end_color="FFCDD2", fill_type="solid")
+    hdr_fill_blue = PatternFill(start_color="BBDEFB", end_color="BBDEFB", fill_type="solid")
+    hdr_fill_yellow = PatternFill(start_color="FFF9C4", end_color="FFF9C4", fill_type="solid")
+    hdr_fill_gray = PatternFill(start_color="E8EAF6", end_color="E8EAF6", fill_type="solid")
+    hdr_font = Font(bold=True, size=8)
+    thin = Border(
+        left=Side(style="thin"), right=Side(style="thin"),
+        top=Side(style="thin"), bottom=Side(style="thin"),
+    )
+    center = Alignment(horizontal="center", vertical="center", wrap_text=True)
+
+    # 행1: 타이틀
+    ws.merge_cells("A1:AG1")
+    title_cell = ws.cell(row=1, column=1, value="상 품 수 불 명 세 서")
+    title_cell.font = Font(bold=True, size=14)
+    title_cell.alignment = Alignment(horizontal="center")
+
+    # 행2: 대분류
+    row2 = [
+        ("DESCRIP", hdr_fill_gray), ("제조사", hdr_fill_gray), ("매입처", hdr_fill_gray),
+    ]
+    # 입고 16컬럼
+    for _ in range(16):
+        row2.append(("입고", hdr_fill_green))
+    # 평균단가
+    row2.append(("평균단가", hdr_fill_yellow))
+    # 출고 12컬럼
+    for _ in range(12):
+        row2.append(("당기출고", hdr_fill_red))
+    # 기말 4컬럼
+    for _ in range(4):
+        row2.append(("기말재고", hdr_fill_blue))
+
+    for col, (val, fill) in enumerate(row2, 1):
+        cell = ws.cell(row=2, column=col, value=val)
+        cell.fill = fill
+        cell.font = hdr_font
+        cell.alignment = center
+        cell.border = thin
+
+    # 행3: 중분류
+    mid_headers = [
+        "", "", "",
+        "전기이월", "", "", "",
+        "전월까지 누적입고", "", "", "",
+        "당월입고", "", "", "",
+        "(기초합산) 당기입고 계", "", "", "",
+        "",  # 평균단가
+        "전월까지 누적출고", "", "", "",
+        "당월출고", "", "", "",
+        "매출누계", "", "", "",
+        "", "", "", "",
+    ]
+    fills3 = [hdr_fill_gray]*3 + [hdr_fill_green]*16 + [hdr_fill_yellow] + [hdr_fill_red]*12 + [hdr_fill_blue]*4
+    for col, val in enumerate(mid_headers, 1):
+        cell = ws.cell(row=3, column=col, value=val)
+        cell.fill = fills3[col-1] if col-1 < len(fills3) else hdr_fill_gray
+        cell.font = hdr_font
+        cell.alignment = center
+        cell.border = thin
+
+    # 행4: 소분류 (수량/Credit(차감)/수량/금액(Credit) 반복)
+    sub4 = ["수량", "Credit(차감)", "수량", "금액(Credit)"]
+    detail_headers = ["DESCRIP", "제조사", "매입처"]
+    for _ in range(4):  # 입고 4그룹
+        detail_headers += sub4
+    detail_headers.append("Credit(차감)")  # 평균단가
+    for _ in range(3):  # 출고 3그룹
+        detail_headers += sub4
+    detail_headers += sub4  # 기말
+    fills4 = [hdr_fill_gray]*3 + [hdr_fill_green]*16 + [hdr_fill_yellow] + [hdr_fill_red]*12 + [hdr_fill_blue]*4
+    for col, val in enumerate(detail_headers, 1):
+        cell = ws.cell(row=4, column=col, value=val)
+        cell.fill = fills4[col-1] if col-1 < len(fills4) else hdr_fill_gray
+        cell.font = Font(size=8)
+        cell.alignment = center
+        cell.border = thin
+
+    # 데이터
+    with get_db() as conn:
+        pm_join = """LEFT JOIN (
+            SELECT part_number, family, vender, customer,
+                   ROW_NUMBER() OVER (PARTITION BY part_number ORDER BY id DESC) as rn
+            FROM product_master
+        ) pm ON di.part_number = pm.part_number AND pm.rn = 1"""
+
+        rows = conn.execute(f"""
+            SELECT di.part_number,
+                   COALESCE(pm.family, '') as family,
+                   COALESCE(pm.vender, '') as vender,
+                   COALESCE(pm.customer, '') as customer,
+                   SUM(CASE WHEN di.inbound_date = '' OR di.inbound_date IS NULL OR SUBSTR(di.inbound_date,1,7) < ?
+                       THEN di.quantity ELSE 0 END) as carry_forward,
+                   SUM(CASE WHEN di.inbound_date = '' OR di.inbound_date IS NULL OR SUBSTR(di.inbound_date,1,7) < ?
+                       THEN di.amount_krw ELSE 0 END) as carry_forward_krw,
+                   SUM(CASE WHEN SUBSTR(di.inbound_date,1,7) >= ? AND SUBSTR(di.inbound_date,1,7) < ?
+                       THEN di.quantity ELSE 0 END) as cum_in_prev,
+                   SUM(CASE WHEN SUBSTR(di.inbound_date,1,7) >= ? AND SUBSTR(di.inbound_date,1,7) < ?
+                       THEN di.amount_krw ELSE 0 END) as cum_in_prev_krw,
+                   SUM(CASE WHEN SUBSTR(di.inbound_date,1,7) = ?
+                       THEN di.quantity ELSE 0 END) as cur_in,
+                   SUM(CASE WHEN SUBSTR(di.inbound_date,1,7) = ?
+                       THEN di.amount_krw ELSE 0 END) as cur_in_krw,
+                   SUM(CASE WHEN di.out_quantity > 0 AND SUBSTR(di.outbound_date,1,7) != ?
+                       THEN di.out_quantity ELSE 0 END) as cum_out_prev,
+                   SUM(CASE WHEN di.out_quantity > 0 AND SUBSTR(di.outbound_date,1,7) != ?
+                       THEN di.out_quantity * di.unit_price_usd * di.exchange_rate ELSE 0 END) as cum_out_prev_krw,
+                   SUM(CASE WHEN di.out_quantity > 0 AND SUBSTR(di.outbound_date,1,7) = ?
+                       THEN di.out_quantity ELSE 0 END) as cur_out,
+                   SUM(CASE WHEN di.out_quantity > 0 AND SUBSTR(di.outbound_date,1,7) = ?
+                       THEN di.out_quantity * di.unit_price_usd * di.exchange_rate ELSE 0 END) as cur_out_krw,
+                   SUM(di.actual_stock) as end_balance,
+                   SUM(CASE WHEN di.actual_stock > 0 THEN di.actual_stock * di.unit_price_usd * di.exchange_rate ELSE 0 END) as end_krw,
+                   CASE WHEN SUM(di.quantity) > 0 THEN SUM(di.amount_krw) / SUM(di.quantity) ELSE 0 END as avg_price,
+                   COALESCE(MAX(cp.credit_usd), 0) as credit_usd
+            FROM datecode_inventory di
+            {pm_join}
+            LEFT JOIN credit_price cp ON di.part_number = cp.part_number
+            GROUP BY di.part_number
+            ORDER BY SUM(di.actual_stock) DESC
+        """, [YEAR_START, YEAR_START, YEAR_START, YEAR_MONTH, YEAR_START, YEAR_MONTH,
+              YEAR_MONTH, YEAR_MONTH, YEAR_MONTH, YEAR_MONTH, YEAR_MONTH, YEAR_MONTH]).fetchall()
+
+        for i, r in enumerate(rows, 5):
+            cf = r["carry_forward"] or 0
+            cf_krw = round(r["carry_forward_krw"] or 0)
+            cip = r["cum_in_prev"] or 0
+            cip_krw = round(r["cum_in_prev_krw"] or 0)
+            ci = r["cur_in"] or 0
+            ci_krw = round(r["cur_in_krw"] or 0)
+            cit = cip + ci
+            cit_krw = cip_krw + ci_krw
+            ig = cf + cit
+            ig_krw = cf_krw + cit_krw
+            cop = r["cum_out_prev"] or 0
+            cop_krw = round(r["cum_out_prev_krw"] or 0)
+            co = r["cur_out"] or 0
+            co_krw = round(r["cur_out_krw"] or 0)
+            cot = cop + co
+            cot_krw = cop_krw + co_krw
+            eb = r["end_balance"] or 0
+            eb_krw = round(r["end_krw"] or 0)
+            cusd = r["credit_usd"] or 0
+
+            row_data = [
+                r["part_number"], r["vender"], r["customer"],
+                # 전기이월
+                cf, round(cf * cusd) if cusd > 0 else "", cf, cf_krw,
+                # 전월누적입고
+                cip, round(cip * cusd) if cusd > 0 else "", cip, cip_krw,
+                # 당월입고
+                ci, round(ci * cusd) if cusd > 0 else "", ci, ci_krw,
+                # 당기입고계
+                ig, round(ig * cusd) if cusd > 0 else "", ig, ig_krw,
+                # 평균단가
+                round(r["avg_price"] or 0),
+                # 전월누적출고
+                cop, round(cop * cusd) if cusd > 0 else "", cop, cop_krw,
+                # 당월출고
+                co, round(co * cusd) if cusd > 0 else "", co, co_krw,
+                # 매출누계
+                cot, round(cot * cusd) if cusd > 0 else "", cot, cot_krw,
+                # 기말재고
+                eb, round(eb * cusd) if cusd > 0 else "", eb, eb_krw,
+            ]
+
+            for col, val in enumerate(row_data, 1):
+                cell = ws.cell(row=i, column=col, value=val if val != "" else None)
+                cell.border = thin
+                cell.font = Font(size=8)
+                if isinstance(val, (int, float)) and val != "":
+                    cell.number_format = '#,##0'
+
+    # 열 너비
+    ws.column_dimensions['A'].width = 28
+    ws.column_dimensions['B'].width = 12
+    ws.column_dimensions['C'].width = 12
+    for c in range(4, 37):
+        ws.column_dimensions[get_column_letter(c)].width = 12
+
+    ws.freeze_panes = "D5"
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=\"ledger_export.xlsx\""},
+    )

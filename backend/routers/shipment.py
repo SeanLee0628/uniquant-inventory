@@ -75,9 +75,28 @@ def _recalculate_dc_yearly(conn, part_number: str):
         )
 
 
+@router.get("/parts/lots")
+def get_part_lots_for_shipment(part_number: str):
+    """출고용 DATECODE별 가용재고 (같은 DC는 합산)"""
+    with get_db() as conn:
+        rows = conn.execute(
+            """SELECT datecode, SUM(actual_stock) as total_stock, COUNT(*) as lot_count
+               FROM datecode_inventory
+               WHERE part_number = ? AND status = '사용가능' AND actual_stock > 0
+               GROUP BY datecode
+               ORDER BY datecode ASC""",
+            (part_number,),
+        ).fetchall()
+        return [
+            {"datecode": r["datecode"] or "", "total_stock": r["total_stock"],
+             "lot_count": r["lot_count"]}
+            for r in rows
+        ]
+
+
 @router.post("/shipment")
 def create_shipment(data: dict):
-    """출고 입력 + FIFO 자동배정 + product_master 동기화"""
+    """출고 입력 + FIFO 자동배정 또는 DATECODE 명시 + product_master 동기화"""
     ship_date = data.get("ship_date", "")
     customer = data.get("customer", "")
     part_number = data.get("part_number", "")
@@ -85,30 +104,53 @@ def create_shipment(data: dict):
     sales_person = data.get("sales_person", "")
     lot_number = data.get("lot_number", "")
     datecode_input = data.get("datecode", "")
+    alloc_mode = data.get("alloc_mode", "fifo")  # "fifo" 또는 "manual"
+    manual_datecode = data.get("manual_datecode", None)  # 수동 선택 시 DATECODE
 
     if quantity <= 0:
         raise HTTPException(400, "수량은 1 이상이어야 합니다.")
 
     with get_db() as conn:
         # 1. 가용재고 확인
-        stock_row = conn.execute(
-            """SELECT COALESCE(SUM(actual_stock), 0) as avail
-               FROM datecode_inventory
-               WHERE part_number = ? AND status = '사용가능' AND actual_stock > 0""",
-            (part_number,),
-        ).fetchone()
-        available = stock_row["avail"]
+        if alloc_mode == "manual" and manual_datecode:
+            stock_row = conn.execute(
+                """SELECT COALESCE(SUM(actual_stock), 0) as avail
+                   FROM datecode_inventory
+                   WHERE part_number = ? AND datecode = ? AND status = '사용가능' AND actual_stock > 0""",
+                (part_number, manual_datecode),
+            ).fetchone()
+            available = stock_row["avail"]
+            if available == 0:
+                raise HTTPException(400, f"DATECODE {manual_datecode}의 가용재고가 없습니다.")
+        else:
+            stock_row = conn.execute(
+                """SELECT COALESCE(SUM(actual_stock), 0) as avail
+                   FROM datecode_inventory
+                   WHERE part_number = ? AND status = '사용가능' AND actual_stock > 0""",
+                (part_number,),
+            ).fetchone()
+            available = stock_row["avail"]
+
         if quantity > available:
             raise HTTPException(400, f"출고수량({quantity})이 가용재고({available})를 초과합니다.")
 
-        # 2. FIFO: DATECODE 오래된 순 차감
-        lots = conn.execute(
-            """SELECT id, datecode, actual_stock, unit_price_usd, exchange_rate
-               FROM datecode_inventory
-               WHERE part_number = ? AND status = '사용가능' AND actual_stock > 0
-               ORDER BY datecode ASC, id ASC""",
-            (part_number,),
-        ).fetchall()
+        # 2. 로트 선택: FIFO 전체 또는 특정 DATECODE 내 FIFO
+        if alloc_mode == "manual" and manual_datecode:
+            lots = conn.execute(
+                """SELECT id, datecode, actual_stock, unit_price_usd, exchange_rate
+                   FROM datecode_inventory
+                   WHERE part_number = ? AND datecode = ? AND status = '사용가능' AND actual_stock > 0
+                   ORDER BY id ASC""",
+                (part_number, manual_datecode),
+            ).fetchall()
+        else:
+            lots = conn.execute(
+                """SELECT id, datecode, actual_stock, unit_price_usd, exchange_rate
+                   FROM datecode_inventory
+                   WHERE part_number = ? AND status = '사용가능' AND actual_stock > 0
+                   ORDER BY datecode ASC, id ASC""",
+                (part_number,),
+            ).fetchall()
 
         remaining = quantity
         allocations = []

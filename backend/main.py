@@ -29,9 +29,20 @@ app.include_router(ledger.router, prefix="/api", tags=["수불부"])
 app.include_router(manual_entry.router, prefix="/api", tags=["수동입력"])
 
 
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    import traceback
+    return JSONResponse(status_code=500, content={"detail": str(exc), "trace": traceback.format_exc()})
+
+
 @app.get("/api/health")
 def health():
-    return {"status": "ok"}
+    import sqlite3
+    db_path = os.environ.get("DB_PATH", os.path.join(os.path.dirname(__file__), "inventory.db"))
+    db_exists = os.path.exists(db_path)
+    db_size = os.path.getsize(db_path) if db_exists else 0
+    writable = os.access(db_path, os.W_OK) if db_exists else False
+    return {"status": "ok", "db_path": db_path, "db_exists": db_exists, "db_size_mb": round(db_size/1024/1024, 1), "db_writable": writable}
 
 
 @app.on_event("startup")

@@ -38,7 +38,7 @@ def init_db():
                 sr_code TEXT,
                 family TEXT,
                 did TEXT,
-                part_number TEXT UNIQUE,
+                part_number TEXT,
                 mobis_id TEXT,
                 unit TEXT DEFAULT 'EA',
                 site TEXT,
@@ -175,6 +175,35 @@ def _migrate(conn):
                 conn.execute(sql)
             except Exception:
                 pass
+
+    # product_master UNIQUE 제약 제거 마이그레이션
+    idx = conn.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='product_master'").fetchone()
+    if idx and "UNIQUE" in (idx[0] or ""):
+        conn.executescript("""
+            ALTER TABLE product_master RENAME TO product_master_old;
+            CREATE TABLE product_master (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                central TEXT, sales_team TEXT, vender TEXT, sr_code TEXT,
+                family TEXT, did TEXT, part_number TEXT, mobis_id TEXT,
+                unit TEXT DEFAULT 'EA', site TEXT, moq INTEGER,
+                package TEXT, fab TEXT, current_qty INTEGER DEFAULT 0,
+                sales_person TEXT, customer TEXT, crd TEXT,
+                booking INTEGER DEFAULT 0, available_qty INTEGER DEFAULT 0,
+                dc_2019 INTEGER DEFAULT 0, dc_2020 INTEGER DEFAULT 0,
+                dc_2021 INTEGER DEFAULT 0, dc_2022 INTEGER DEFAULT 0,
+                dc_2023 INTEGER DEFAULT 0, dc_2024 INTEGER DEFAULT 0,
+                dc_2025 INTEGER DEFAULT 0, dc_2026 INTEGER DEFAULT 0,
+                total_inbound INTEGER DEFAULT 0, total_outbound INTEGER DEFAULT 0,
+                prev_month_balance INTEGER DEFAULT 0,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            INSERT INTO product_master SELECT * FROM product_master_old;
+            DROP TABLE product_master_old;
+        """)
+        # 인덱스 재생성
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_product_part ON product_master(part_number)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_product_vender ON product_master(vender)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_product_family ON product_master(family)")
 
     existing_sl = {r[1] for r in conn.execute("PRAGMA table_info(shipment_log)").fetchall()}
     if "source_datecode_ids" not in existing_sl:

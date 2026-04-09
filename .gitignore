@@ -3,6 +3,7 @@ __pycache__/
 *.db
 backend/.env
 frontend/node_modules/
-frontend/build/
+frontend/build/static/js/*.map
+frontend/build/static/css/*.map
 .DS_Store
 *.tmp

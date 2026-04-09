@@ -10,10 +10,9 @@ npm install
 npm run build
 cd ..
 
-echo "=== Copying database to /tmp ==="
-if [ -f backend/inventory.db ]; then
-  cp backend/inventory.db /tmp/inventory.db
-  echo "Database copied to /tmp/inventory.db"
-fi
+echo "=== Checking database ==="
+ls -lh backend/inventory.db || echo "WARNING: inventory.db not found!"
+echo "=== Build complete ==="
+echo "DB will be copied to /tmp at start time"
 
 echo "=== Build complete ==="

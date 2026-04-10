@@ -26,7 +26,7 @@ def dashboard_summary(month: Optional[str] = None):
             ).fetchone()
         else:
             r6 = conn.execute(
-                "SELECT COALESCE(SUM(quantity), 0) as v FROM shipment_log WHERE SUBSTR(ship_date,1,7) = SUBSTR(date('now'),1,7)"
+                "SELECT COALESCE(SUM(quantity), 0) as v FROM shipment_log WHERE SUBSTR(ship_date,1,7) = TO_CHAR(CURRENT_DATE, 'YYYY-MM')"
             ).fetchone()
         # 노후 재고 금액
         r7 = conn.execute(
@@ -99,7 +99,7 @@ def monthly_trend(months: int = Query(6, ge=3, le=24)):
             """SELECT SUBSTR(ship_date, 1, 7) as month, SUM(quantity) as qty
                FROM shipment_log
                WHERE ship_date != '' AND ship_date IS NOT NULL
-               GROUP BY month ORDER BY month DESC
+               GROUP BY SUBSTR(ship_date, 1, 7) ORDER BY SUBSTR(ship_date, 1, 7) DESC
                LIMIT ?""",
             (months,),
         ).fetchall()
@@ -118,6 +118,6 @@ def datecode_distribution():
                       SUM(actual_stock) as quantity
                FROM datecode_inventory
                WHERE status = '사용가능' AND actual_stock > 0 AND datecode != '' AND datecode IS NOT NULL
-               GROUP BY year ORDER BY year ASC"""
+               GROUP BY SUBSTR(datecode, 1, 4) ORDER BY SUBSTR(datecode, 1, 4) ASC"""
         ).fetchall()
         return [{"year": r["year"], "quantity": r["quantity"] or 0} for r in rows]

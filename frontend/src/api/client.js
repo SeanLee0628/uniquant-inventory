@@ -67,6 +67,7 @@ export const getLedgerDetail = (pn) => api.get('/ledger/detail/' + encodeURIComp
 
 // 수동 입력
 export const createManualEntry = (data) => api.post('/manual-entry', data);
+export const createBulkEntry = (items) => api.post('/manual-entry/bulk', { items });
 export const getRecentEntries = (limit = 20) => api.get('/manual-entry/recent', { params: { limit } });
 export const getTodayEntries = () => api.get('/manual-entry/today');
 

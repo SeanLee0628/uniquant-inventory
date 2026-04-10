@@ -37,12 +37,13 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 @app.get("/api/health")
 def health():
-    import sqlite3
-    db_path = os.environ.get("DB_PATH", os.path.join(os.path.dirname(__file__), "inventory.db"))
-    db_exists = os.path.exists(db_path)
-    db_size = os.path.getsize(db_path) if db_exists else 0
-    writable = os.access(db_path, os.W_OK) if db_exists else False
-    return {"status": "ok", "db_path": db_path, "db_exists": db_exists, "db_size_mb": round(db_size/1024/1024, 1), "db_writable": writable}
+    from database import get_db
+    try:
+        with get_db() as conn:
+            r = conn.execute("SELECT COUNT(*) as cnt FROM product_master").fetchone()
+            return {"status": "ok", "db": "postgresql", "product_count": r["cnt"]}
+    except Exception as e:
+        return {"status": "error", "detail": str(e)}
 
 
 @app.on_event("startup")

@@ -102,6 +102,73 @@ def create_manual_entry(entry: ManualDatecodeEntry):
     return ManualEntryResponse(id=new_id, message="입고 등록 완료")
 
 
+class BulkDatecodeEntry(BaseModel):
+    items: list[ManualDatecodeEntry] = Field(..., min_length=1)
+
+
+@router.post("/manual-entry/bulk")
+def create_bulk_entry(payload: BulkDatecodeEntry):
+    """Datecode 대량 입력 — 여러 건을 한번에 등록"""
+    results = []
+    errors = []
+
+    with get_db() as conn:
+        for i, entry in enumerate(payload.items):
+            try:
+                dc_str = entry.datecode.strip()
+                dc_date = datecode_to_date(dc_str)
+                days_elapsed = (date.today() - dc_date).days if dc_date else 0
+                urgency = calc_urgency(days_elapsed)
+
+                cursor = conn.execute(
+                    """INSERT INTO datecode_inventory (
+                        sales_team, inbound_date, sr_number, part_number, quantity,
+                        datecode, datecode_date, days_elapsed, sales_person, customer,
+                        po_number, remark, actual_stock, outbound_date, out_customer,
+                        out_part_number, out_quantity, out_sales, out_remark, status,
+                        unit_price_usd, amount_usd, exchange_rate, amount_krw, urgency
+                    ) VALUES (
+                        '수동입력', :inbound_date, :sr_number, :part_number, :quantity,
+                        :datecode, :datecode_date, :days_elapsed, :sales_person, :customer,
+                        '', '', :quantity, '', '',
+                        '', 0, '', '', '사용가능',
+                        0, 0, 0, 0, :urgency
+                    )""",
+                    {
+                        "inbound_date": entry.inbound_date,
+                        "sr_number": entry.sr_number,
+                        "part_number": entry.part_number,
+                        "quantity": entry.quantity,
+                        "datecode": dc_str,
+                        "datecode_date": dc_date.isoformat() if dc_date else "",
+                        "days_elapsed": days_elapsed,
+                        "sales_person": entry.sales_person,
+                        "customer": entry.customer,
+                        "urgency": urgency,
+                    },
+                )
+                results.append({"row": i + 1, "id": cursor.lastrowid, "part_number": entry.part_number})
+
+                if entry.inbound_date:
+                    try:
+                        d = datetime.strptime(entry.inbound_date, "%Y-%m-%d")
+                        ym = d.strftime("%Y-%m")
+                        day = d.day
+                        conn.execute(
+                            """INSERT INTO daily_inventory (part_number, year_month, day, inbound_qty)
+                               VALUES (?, ?, ?, ?)
+                               ON CONFLICT(part_number, year_month, day)
+                               DO UPDATE SET inbound_qty = inbound_qty + excluded.inbound_qty""",
+                            (entry.part_number, ym, day, entry.quantity),
+                        )
+                    except (ValueError, TypeError):
+                        pass
+            except Exception as e:
+                errors.append({"row": i + 1, "part_number": entry.part_number, "error": str(e)})
+
+    return {"inserted": len(results), "errors": errors, "results": results}
+
+
 @router.get("/manual-entry/recent")
 def get_recent_entries(limit: int = 20):
     """최근 수동 입력 내역 조회"""

@@ -53,20 +53,20 @@ def _gather_report_data() -> dict:
         rows = conn.execute(
             """SELECT part_number, customer, SUM(quantity) as qty
                FROM shipment_log
-               WHERE ship_date >= date('now', '-7 days')
+               WHERE ship_date >= CURRENT_DATE - INTERVAL '7 days'
                GROUP BY part_number, customer
                ORDER BY qty DESC LIMIT 10"""
         ).fetchall()
         data["weekly_shipments_top"] = [dict(r) for r in rows]
 
         r = conn.execute(
-            "SELECT COALESCE(SUM(quantity),0) as v FROM shipment_log WHERE ship_date >= date('now', '-7 days')"
+            "SELECT COALESCE(SUM(quantity),0) as v FROM shipment_log WHERE ship_date >= CURRENT_DATE - INTERVAL '7 days'"
         ).fetchone()
         data["weekly_outbound_total"] = r["v"]
 
         # 6. 전주 대비 (7~14일 전)
         r = conn.execute(
-            "SELECT COALESCE(SUM(quantity),0) as v FROM shipment_log WHERE ship_date >= date('now', '-14 days') AND ship_date < date('now', '-7 days')"
+            "SELECT COALESCE(SUM(quantity),0) as v FROM shipment_log WHERE ship_date >= CURRENT_DATE - INTERVAL '14 days' AND ship_date < CURRENT_DATE - INTERVAL '7 days'"
         ).fetchone()
         data["prev_week_outbound"] = r["v"]
 
@@ -85,8 +85,8 @@ def _gather_report_data() -> dict:
                FROM product_master pm
                LEFT JOIN datecode_inventory di ON pm.part_number = di.part_number
                WHERE pm.moq > 0
-               GROUP BY pm.part_number
-               HAVING (stock - pm.booking) <= pm.moq
+               GROUP BY pm.part_number, pm.moq, pm.booking
+               HAVING (COALESCE(SUM(CASE WHEN di.status='사용가능' THEN di.actual_stock ELSE 0 END),0) - pm.booking) <= pm.moq
                LIMIT 10"""
         ).fetchall()
         data["moq_alerts"] = [dict(r) for r in rows]
@@ -106,13 +106,13 @@ def _gather_anomaly_data() -> dict:
                FROM (
                  SELECT part_number, SUM(quantity) as qty
                  FROM shipment_log
-                 WHERE ship_date >= date('now', '-30 days')
+                 WHERE ship_date >= CURRENT_DATE - INTERVAL '30 days'
                  GROUP BY part_number
                ) recent
                LEFT JOIN (
                  SELECT part_number, SUM(quantity)/3.0 as avg_qty
                  FROM shipment_log
-                 WHERE ship_date >= date('now', '-120 days') AND ship_date < date('now', '-30 days')
+                 WHERE ship_date >= CURRENT_DATE - INTERVAL '120 days' AND ship_date < CURRENT_DATE - INTERVAL '30 days'
                  GROUP BY part_number
                ) prev ON recent.part_number = prev.part_number
                WHERE prev.avg_qty > 0 AND recent.qty > prev.avg_qty * 1.5
@@ -129,11 +129,11 @@ def _gather_anomaly_data() -> dict:
                WHERE di.status = '사용가능' AND di.actual_stock > 0
                  AND di.part_number NOT IN (
                    SELECT DISTINCT part_number FROM shipment_log
-                   WHERE ship_date >= date('now', '-180 days')
+                   WHERE ship_date >= CURRENT_DATE - INTERVAL '180 days'
                  )
-               GROUP BY di.part_number
-               HAVING stock > 0
-               ORDER BY krw DESC
+               GROUP BY di.part_number, di.sr_number
+               HAVING SUM(di.actual_stock) > 0
+               ORDER BY SUM(di.amount_krw) DESC
                LIMIT 10"""
         ).fetchall()
         data["stale_items"] = [dict(r) for r in rows]
@@ -141,13 +141,14 @@ def _gather_anomaly_data() -> dict:
         # 3. 재고 급감 품목: 전주 대비 50% 이상 감소
         rows = conn.execute(
             """SELECT part_number,
-                      SUM(CASE WHEN ship_date >= date('now', '-7 days') THEN quantity ELSE 0 END) as this_week,
-                      SUM(CASE WHEN ship_date >= date('now', '-14 days') AND ship_date < date('now', '-7 days') THEN quantity ELSE 0 END) as last_week
+                      SUM(CASE WHEN ship_date >= CURRENT_DATE - INTERVAL '7 days' THEN quantity ELSE 0 END) as this_week,
+                      SUM(CASE WHEN ship_date >= CURRENT_DATE - INTERVAL '14 days' AND ship_date < CURRENT_DATE - INTERVAL '7 days' THEN quantity ELSE 0 END) as last_week
                FROM shipment_log
-               WHERE ship_date >= date('now', '-14 days')
+               WHERE ship_date >= CURRENT_DATE - INTERVAL '14 days'
                GROUP BY part_number
-               HAVING this_week > last_week * 1.5 AND last_week > 0
-               ORDER BY this_week DESC
+               HAVING SUM(CASE WHEN ship_date >= CURRENT_DATE - INTERVAL '7 days' THEN quantity ELSE 0 END) > SUM(CASE WHEN ship_date >= CURRENT_DATE - INTERVAL '14 days' AND ship_date < CURRENT_DATE - INTERVAL '7 days' THEN quantity ELSE 0 END) * 1.5
+                  AND SUM(CASE WHEN ship_date >= CURRENT_DATE - INTERVAL '14 days' AND ship_date < CURRENT_DATE - INTERVAL '7 days' THEN quantity ELSE 0 END) > 0
+               ORDER BY SUM(CASE WHEN ship_date >= CURRENT_DATE - INTERVAL '7 days' THEN quantity ELSE 0 END) DESC
                LIMIT 10"""
         ).fetchall()
         data["spike_outbound"] = [dict(r) for r in rows]

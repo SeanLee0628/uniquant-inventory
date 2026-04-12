@@ -206,7 +206,8 @@ export default function Datecode() {
                 <th>금액(USD)</th>
                 <th>환율</th>
                 <th onClick={() => handleSort('di.amount_krw')}>금액(KRW){sortIcon('di.amount_krw')}</th>
-                <th onClick={() => handleSort('di.days_elapsed')}>경과일{sortIcon('di.days_elapsed')}</th>
+                <th onClick={() => handleSort('di.days_elapsed')} title="오늘 - 데이트코드 환산일: 제조 후 현재까지 경과일수 (노후도)">경과일수(노후){sortIcon('di.days_elapsed')}</th>
+                <th title="입고일 - 데이트코드 환산일: 제조 후 입고까지 걸린 일수">경과일수(리드타임)</th>
                 <th>노후도</th>
               </tr>
             </thead>
@@ -229,12 +230,13 @@ export default function Datecode() {
                   <td style={{ textAlign: 'right' }}>{row.amount_usd ? '$' + row.amount_usd.toLocaleString() : ''}</td>
                   <td style={{ textAlign: 'right' }}>{row.exchange_rate || ''}</td>
                   <td style={{ textAlign: 'right' }}>{row.amount_krw ? '₩' + row.amount_krw.toLocaleString() : ''}</td>
-                  <td style={{ textAlign: 'right' }}>{row.days_elapsed.toLocaleString()}일</td>
+                  <td style={{ textAlign: 'right' }} title="오늘 - 데이트코드 환산일">{row.days_elapsed.toLocaleString()}일</td>
+                  <td style={{ textAlign: 'right' }} title="입고일 - 데이트코드 환산일">{row.lead_time_days != null ? row.lead_time_days.toLocaleString() + '일' : '-'}</td>
                   <td><span className={'urgency-tag ' + row.urgency} title={urgencyTooltip[row.urgency]}>{urgencyLabel[row.urgency]}</span></td>
                 </tr>
               ))}
               {items.length === 0 && (
-                <tr><td colSpan={18} style={{ textAlign: 'center', padding: 40, color: '#aaa' }}>데이터가 없습니다</td></tr>
+                <tr><td colSpan={19} style={{ textAlign: 'center', padding: 40, color: '#aaa' }}>데이터가 없습니다</td></tr>
               )}
             </tbody>
           </table>

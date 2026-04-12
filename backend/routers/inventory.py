@@ -9,7 +9,21 @@ import re
 router = APIRouter()
 
 
+def _calc_lead_time(inbound_date_str, datecode_date_str):
+    """입고일 - 데이트코드환산일 = 입고 리드타임(일)"""
+    if not inbound_date_str or not datecode_date_str:
+        return None
+    try:
+        from datetime import datetime
+        ib = datetime.strptime(inbound_date_str[:10], "%Y-%m-%d").date()
+        dc = datetime.strptime(datecode_date_str[:10], "%Y-%m-%d").date()
+        return (ib - dc).days
+    except (ValueError, TypeError):
+        return None
+
+
 def row_to_dict(r) -> dict:
+    lead_time = _calc_lead_time(r["inbound_date"], r["datecode_date"])
     return {
         "id": r["id"],
         "sales_team": r["sales_team"] or "",
@@ -20,6 +34,7 @@ def row_to_dict(r) -> dict:
         "datecode": r["datecode"] or "",
         "datecode_date": r["datecode_date"] or "",
         "days_elapsed": r["days_elapsed"] or 0,
+        "lead_time_days": lead_time,
         "sales_person": r["sales_person"] or "",
         "customer": r["pm_customer"] or r["customer"] or "",
         "actual_stock": r["actual_stock"] or 0,

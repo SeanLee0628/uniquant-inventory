@@ -94,6 +94,25 @@ def get_part_lots_for_shipment(part_number: str):
         ]
 
 
+@router.get("/parts/sr-lots")
+def get_part_sr_lots(part_number: str):
+    """출고용 SR#별 가용재고"""
+    with get_db() as conn:
+        rows = conn.execute(
+            """SELECT sr_number, SUM(actual_stock) as total_stock, COUNT(*) as lot_count
+               FROM datecode_inventory
+               WHERE part_number = ? AND status = '사용가능' AND actual_stock > 0
+               GROUP BY sr_number
+               ORDER BY sr_number ASC""",
+            (part_number,),
+        ).fetchall()
+        return [
+            {"sr_number": r["sr_number"] or "", "total_stock": r["total_stock"],
+             "lot_count": r["lot_count"]}
+            for r in rows
+        ]
+
+
 @router.post("/shipment")
 def create_shipment(data: dict):
     """출고 입력 + FIFO 자동배정 또는 DATECODE 명시 + product_master 동기화"""
@@ -104,8 +123,9 @@ def create_shipment(data: dict):
     sales_person = data.get("sales_person", "")
     lot_number = data.get("lot_number", "")
     datecode_input = data.get("datecode", "")
-    alloc_mode = data.get("alloc_mode", "fifo")  # "fifo" 또는 "manual"
+    alloc_mode = data.get("alloc_mode", "fifo")  # "fifo", "manual", "sr"
     manual_datecode = data.get("manual_datecode", None)  # 수동 선택 시 DATECODE
+    manual_sr = data.get("manual_sr", None)  # SR# 명시 시
 
     if quantity <= 0:
         raise HTTPException(400, "수량은 1 이상이어야 합니다.")
@@ -122,6 +142,16 @@ def create_shipment(data: dict):
             available = stock_row["avail"]
             if available == 0:
                 raise HTTPException(400, f"DATECODE {manual_datecode}의 가용재고가 없습니다.")
+        elif alloc_mode == "sr" and manual_sr:
+            stock_row = conn.execute(
+                """SELECT COALESCE(SUM(actual_stock), 0) as avail
+                   FROM datecode_inventory
+                   WHERE part_number = ? AND sr_number = ? AND status = '사용가능' AND actual_stock > 0""",
+                (part_number, manual_sr),
+            ).fetchone()
+            available = stock_row["avail"]
+            if available == 0:
+                raise HTTPException(400, f"SR# {manual_sr}의 가용재고가 없습니다.")
         else:
             stock_row = conn.execute(
                 """SELECT COALESCE(SUM(actual_stock), 0) as avail
@@ -134,7 +164,7 @@ def create_shipment(data: dict):
         if quantity > available:
             raise HTTPException(400, f"출고수량({quantity})이 가용재고({available})를 초과합니다.")
 
-        # 2. 로트 선택: FIFO 전체 또는 특정 DATECODE 내 FIFO
+        # 2. 로트 선택
         if alloc_mode == "manual" and manual_datecode:
             lots = conn.execute(
                 """SELECT id, datecode, actual_stock, unit_price_usd, exchange_rate
@@ -142,6 +172,14 @@ def create_shipment(data: dict):
                    WHERE part_number = ? AND datecode = ? AND status = '사용가능' AND actual_stock > 0
                    ORDER BY id ASC""",
                 (part_number, manual_datecode),
+            ).fetchall()
+        elif alloc_mode == "sr" and manual_sr:
+            lots = conn.execute(
+                """SELECT id, datecode, actual_stock, unit_price_usd, exchange_rate
+                   FROM datecode_inventory
+                   WHERE part_number = ? AND sr_number = ? AND status = '사용가능' AND actual_stock > 0
+                   ORDER BY datecode ASC, id ASC""",
+                (part_number, manual_sr),
             ).fetchall()
         else:
             lots = conn.execute(

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { searchParts, getPartStock, getPartLotsForShipment, createShipment } from '../api/client';
+import { searchParts, getPartStock, getPartLotsForShipment, getPartSrLots, createShipment } from '../api/client';
 
 export default function ShipmentForm() {
   const [form, setForm] = useState({
@@ -17,9 +17,11 @@ export default function ShipmentForm() {
   const sugRef = useRef(null);
 
   // 배정 모드
-  const [allocMode, setAllocMode] = useState('fifo'); // 'fifo' or 'manual'
+  const [allocMode, setAllocMode] = useState('fifo'); // 'fifo', 'manual', 'sr'
   const [dcList, setDcList] = useState([]);
   const [selectedDc, setSelectedDc] = useState(null);
+  const [srList, setSrList] = useState([]);
+  const [selectedSr, setSelectedSr] = useState(null);
 
   const handlePartChange = async (val) => {
     setForm(f => ({ ...f, part_number: val }));
@@ -28,6 +30,8 @@ export default function ShipmentForm() {
     setResult(null);
     setDcList([]);
     setSelectedDc(null);
+    setSrList([]);
+    setSelectedSr(null);
     if (val.length >= 2) {
       try {
         const res = await searchParts(val);
@@ -50,7 +54,9 @@ export default function ShipmentForm() {
       // 로트 목록도 로드
       const lotsRes = await getPartLotsForShipment(pn);
       setDcList(lotsRes.data);
-    } catch { setStock(null); setPartInfo(null); setDcList([]); }
+      const srRes = await getPartSrLots(pn);
+      setSrList(srRes.data);
+    } catch { setStock(null); setPartInfo(null); setDcList([]); setSrList([]); }
   };
 
   useEffect(() => {
@@ -84,6 +90,14 @@ export default function ShipmentForm() {
       setError(`선택한 DATECODE의 재고(${selectedDc.total_stock.toLocaleString()})를 초과합니다.`);
       return;
     }
+    if (allocMode === 'sr' && !selectedSr) {
+      setError('SR#을 선택해주세요.');
+      return;
+    }
+    if (allocMode === 'sr' && selectedSr && qty > selectedSr.total_stock) {
+      setError(`선택한 SR#의 재고(${selectedSr.total_stock.toLocaleString()})를 초과합니다.`);
+      return;
+    }
     if (allocMode === 'fifo' && stock !== null && qty > stock) {
       setError('출고수량(' + qty + ')이 가용재고(' + stock + ')를 초과합니다.');
       return;
@@ -94,6 +108,7 @@ export default function ShipmentForm() {
         ...form, quantity: qty,
         alloc_mode: allocMode,
         manual_datecode: allocMode === 'manual' && selectedDc ? selectedDc.datecode : null,
+        manual_sr: allocMode === 'sr' && selectedSr ? selectedSr.sr_number : null,
       };
       const res = await createShipment(payload);
       setResult(res.data);
@@ -105,6 +120,9 @@ export default function ShipmentForm() {
         const lotsRes = await getPartLotsForShipment(form.part_number);
         setDcList(lotsRes.data);
         setSelectedDc(null);
+        const srRes = await getPartSrLots(form.part_number);
+        setSrList(srRes.data);
+        setSelectedSr(null);
       } catch {}
     } catch (err) {
       setError(err.response?.data?.detail || '출고 처리 중 오류가 발생했습니다.');
@@ -191,8 +209,14 @@ export default function ShipmentForm() {
               <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
                 <input type="radio" name="allocMode" value="manual"
                   checked={allocMode === 'manual'}
-                  onChange={() => setAllocMode('manual')} />
-                <span>DATECODE 명시 <span style={{ fontSize: 12, color: '#888' }}>(특정 로트 선택)</span></span>
+                  onChange={() => { setAllocMode('manual'); setSelectedSr(null); }} />
+                <span>DATECODE 명시 <span style={{ fontSize: 12, color: '#888' }}>(특정 DATECODE 선택)</span></span>
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                <input type="radio" name="allocMode" value="sr"
+                  checked={allocMode === 'sr'}
+                  onChange={() => { setAllocMode('sr'); setSelectedDc(null); }} />
+                <span>SR# 명시 <span style={{ fontSize: 12, color: '#888' }}>(특정 SR# 내 FIFO)</span></span>
               </label>
             </div>
 
@@ -219,6 +243,35 @@ export default function ShipmentForm() {
                 )}
               </div>
             )}
+
+            {allocMode === 'sr' && (
+              <div style={{ marginTop: 12 }}>
+                <label style={{ fontSize: 13, marginBottom: 4, display: 'block' }}>SR# 선택 *</label>
+                {srList.length > 0 ? (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                    {srList.map(sr => (
+                      <button type="button" key={sr.sr_number}
+                        onClick={() => setSelectedSr(sr)}
+                        style={{
+                          padding: '6px 14px', borderRadius: 6, cursor: 'pointer', fontSize: 13,
+                          border: selectedSr?.sr_number === sr.sr_number ? '2px solid #1565c0' : '1px solid #ddd',
+                          background: selectedSr?.sr_number === sr.sr_number ? '#e3f2fd' : '#fff',
+                          fontWeight: selectedSr?.sr_number === sr.sr_number ? 700 : 400,
+                        }}>
+                        {sr.sr_number || '(없음)'} ({sr.total_stock.toLocaleString()}개)
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <span style={{ color: '#888', fontSize: 13 }}>Part#를 먼저 선택하세요</span>
+                )}
+                {selectedSr && (
+                  <div style={{ marginTop: 8, color: '#2e7d32', fontWeight: 600, fontSize: 13 }}>
+                    선택: {selectedSr.sr_number} — 가용재고: {selectedSr.total_stock.toLocaleString()}개 ({selectedSr.lot_count}로트)
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="form-row">
@@ -239,14 +292,14 @@ export default function ShipmentForm() {
           {error && <div style={{ color: '#ff4757', marginBottom: 16, fontWeight: 600 }}>{error}</div>}
 
           <button type="submit" className="btn btn-primary" disabled={loading}>
-            {loading ? '처리 중...' : allocMode === 'fifo' ? '출고 등록 (FIFO 자동배정)' : '출고 등록 (DATECODE 명시)'}
+            {loading ? '처리 중...' : allocMode === 'fifo' ? '출고 등록 (FIFO 자동배정)' : allocMode === 'manual' ? '출고 등록 (DATECODE 명시)' : '출고 등록 (SR# 명시)'}
           </button>
         </form>
       </div>
 
       {result && (
         <div className="fifo-result">
-          <h4>✅ 출고 완료 — {allocMode === 'fifo' ? 'FIFO 배정' : 'DATECODE 명시'} 결과</h4>
+          <h4>✅ 출고 완료 — {allocMode === 'fifo' ? 'FIFO 배정' : allocMode === 'manual' ? 'DATECODE 명시' : 'SR# 명시'} 결과</h4>
           <p style={{ fontSize: 13, marginBottom: 12 }}>
             {result.shipment.part_number} | {result.shipment.quantity}개 | {result.shipment.customer}
           </p>

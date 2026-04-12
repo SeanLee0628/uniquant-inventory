@@ -26,6 +26,7 @@ export const getDailyInventory = (pn, ym) => api.get('/inventory/daily/' + encod
 export const searchParts = (q) => api.get('/parts/search', { params: { q } });
 export const getPartStock = (partNumber) => api.get('/parts/stock', { params: { part_number: partNumber } });
 export const getPartLotsForShipment = (partNumber) => api.get('/parts/lots', { params: { part_number: partNumber } });
+export const getPartSrLots = (partNumber) => api.get('/parts/sr-lots', { params: { part_number: partNumber } });
 export const createShipment = (data) => api.post('/shipment', data);
 export const getShipments = (params) => api.get('/shipments', { params });
 export const getShipmentCount = (params) => api.get('/shipments/count', { params });

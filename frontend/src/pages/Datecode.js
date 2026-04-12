@@ -197,15 +197,20 @@ export default function Datecode() {
                 <th onClick={() => handleSort('di.datecode')}>DATECODE{sortIcon('di.datecode')}</th>
                 <th>담당SALES</th>
                 <th>CUSTOMER</th>
+                <th>REMARK</th>
                 <th onClick={() => handleSort('di.actual_stock')}>실재고{sortIcon('di.actual_stock')}</th>
                 <th>출고일</th>
                 <th>출고고객</th>
+                <th>출고PART#</th>
                 <th>출고수량</th>
+                <th>출고SALES</th>
+                <th>출고REMARK</th>
                 <th>상태</th>
                 <th>단가(USD)</th>
                 <th>금액(USD)</th>
                 <th>환율</th>
                 <th onClick={() => handleSort('di.amount_krw')}>금액(KRW){sortIcon('di.amount_krw')}</th>
+                <th title="DATECODE(YYYYWW)를 날짜로 환산">DC환산일</th>
                 <th onClick={() => handleSort('di.days_elapsed')} title="오늘 - 데이트코드 환산일: 제조 후 현재까지 경과일수 (노후도)">경과일수(노후){sortIcon('di.days_elapsed')}</th>
                 <th title="입고일 - 데이트코드 환산일: 제조 후 입고까지 걸린 일수">경과일수(리드타임)</th>
                 <th>노후도</th>
@@ -221,22 +226,27 @@ export default function Datecode() {
                   <td>{row.datecode}</td>
                   <td>{row.sales_person}</td>
                   <td>{row.customer}</td>
+                  <td>{row.remark || ''}</td>
                   <td style={{ textAlign: 'right', fontWeight: 700 }}>{row.actual_stock.toLocaleString()}</td>
                   <td>{row.outbound_date || ''}</td>
                   <td>{row.out_customer || ''}</td>
+                  <td>{row.out_part_number || ''}</td>
                   <td style={{ textAlign: 'right' }}>{row.out_quantity ? row.out_quantity.toLocaleString() : ''}</td>
+                  <td>{row.out_sales || ''}</td>
+                  <td>{row.out_remark || ''}</td>
                   <td><span className={'status-badge ' + row.status}>{row.status}</span></td>
                   <td style={{ textAlign: 'right' }}>{row.unit_price_usd ? row.unit_price_usd.toFixed(2) : ''}</td>
                   <td style={{ textAlign: 'right' }}>{row.amount_usd ? '$' + row.amount_usd.toLocaleString() : ''}</td>
                   <td style={{ textAlign: 'right' }}>{row.exchange_rate || ''}</td>
                   <td style={{ textAlign: 'right' }}>{row.amount_krw ? '₩' + row.amount_krw.toLocaleString() : ''}</td>
+                  <td title="DATECODE → 날짜 환산">{row.datecode_date || '-'}</td>
                   <td style={{ textAlign: 'right' }} title="오늘 - 데이트코드 환산일">{row.days_elapsed.toLocaleString()}일</td>
                   <td style={{ textAlign: 'right' }} title="입고일 - 데이트코드 환산일">{row.lead_time_days != null ? row.lead_time_days.toLocaleString() + '일' : '-'}</td>
                   <td><span className={'urgency-tag ' + row.urgency} title={urgencyTooltip[row.urgency]}>{urgencyLabel[row.urgency]}</span></td>
                 </tr>
               ))}
               {items.length === 0 && (
-                <tr><td colSpan={19} style={{ textAlign: 'center', padding: 40, color: '#aaa' }}>데이터가 없습니다</td></tr>
+                <tr><td colSpan={24} style={{ textAlign: 'center', padding: 40, color: '#aaa' }}>데이터가 없습니다</td></tr>
               )}
             </tbody>
           </table>

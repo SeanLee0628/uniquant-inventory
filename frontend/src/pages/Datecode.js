@@ -12,8 +12,6 @@ const emptyForm = {
   inbound_date: new Date().toISOString().slice(0, 10),
   sr_number: '', part_number: '', quantity: '',
   datecode: '', sales_person: '', customer: '',
-  po_number: '', remark: '',
-  unit_price_usd: '', exchange_rate: '',
 };
 
 export default function Datecode() {
@@ -73,8 +71,6 @@ export default function Datecode() {
         ...form,
         sales_team: team,
         quantity: parseInt(form.quantity) || 0,
-        unit_price_usd: parseFloat(form.unit_price_usd) || 0,
-        exchange_rate: parseFloat(form.exchange_rate) || 0,
       };
       await addInbound(payload);
       setMessage(`${form.part_number} ${form.quantity}개 입고 완료`);
@@ -122,24 +118,24 @@ export default function Datecode() {
                   onChange={e => updateField('inbound_date', e.target.value)} />
               </label>
               <label>
+                <span style={{ fontSize: 12, color: '#666' }}>SR#</span>
+                <input value={form.sr_number} placeholder="SR#"
+                  onChange={e => updateField('sr_number', e.target.value)} />
+              </label>
+              <label>
                 <span style={{ fontSize: 12, color: '#666' }}>Part# *</span>
                 <input value={form.part_number} required placeholder="Part#"
                   onChange={e => updateField('part_number', e.target.value)} />
               </label>
               <label>
-                <span style={{ fontSize: 12, color: '#666' }}>수량 *</span>
-                <input type="number" value={form.quantity} required placeholder="수량" min="1"
+                <span style={{ fontSize: 12, color: '#666' }}>Q'ty *</span>
+                <input type="number" value={form.quantity} required placeholder="Q'ty" min="1"
                   onChange={e => updateField('quantity', e.target.value)} />
               </label>
               <label>
                 <span style={{ fontSize: 12, color: '#666' }}>DATECODE</span>
                 <input value={form.datecode} placeholder="예: 202614"
                   onChange={e => updateField('datecode', e.target.value)} />
-              </label>
-              <label>
-                <span style={{ fontSize: 12, color: '#666' }}>SR#</span>
-                <input value={form.sr_number} placeholder="SR#"
-                  onChange={e => updateField('sr_number', e.target.value)} />
               </label>
               <label>
                 <span style={{ fontSize: 12, color: '#666' }}>담당 SALES</span>
@@ -150,26 +146,6 @@ export default function Datecode() {
                 <span style={{ fontSize: 12, color: '#666' }}>CUSTOMER</span>
                 <input value={form.customer} placeholder="고객"
                   onChange={e => updateField('customer', e.target.value)} />
-              </label>
-              <label>
-                <span style={{ fontSize: 12, color: '#666' }}>PO#</span>
-                <input value={form.po_number} placeholder="PO#"
-                  onChange={e => updateField('po_number', e.target.value)} />
-              </label>
-              <label>
-                <span style={{ fontSize: 12, color: '#666' }}>단가(USD)</span>
-                <input type="number" step="0.01" value={form.unit_price_usd} placeholder="0.00"
-                  onChange={e => updateField('unit_price_usd', e.target.value)} />
-              </label>
-              <label>
-                <span style={{ fontSize: 12, color: '#666' }}>환율</span>
-                <input type="number" step="0.01" value={form.exchange_rate} placeholder="1400.00"
-                  onChange={e => updateField('exchange_rate', e.target.value)} />
-              </label>
-              <label>
-                <span style={{ fontSize: 12, color: '#666' }}>REMARK</span>
-                <input value={form.remark} placeholder="비고"
-                  onChange={e => updateField('remark', e.target.value)} />
               </label>
               <label style={{ display: 'flex', alignItems: 'flex-end' }}>
                 <button type="submit" className="btn btn-primary" disabled={submitting}

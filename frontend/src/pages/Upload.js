@@ -83,18 +83,7 @@ export default function Upload() {
     <div>
       <h1 className="page-title">데이터 업로드</h1>
 
-      <div style={{ marginBottom: 20, display: 'flex', gap: 12 }}>
-        <button className={'btn btn-sm ' + (uploadType === 'bulk' ? 'btn-primary' : 'btn-outline')}
-          onClick={() => { setUploadType('bulk'); resetResults(); }}>
-          대량업로드
-        </button>
-        <button className={'btn btn-sm ' + (uploadType === 'manual' ? 'btn-primary' : 'btn-outline')}
-          onClick={() => { setUploadType('manual'); resetResults(); }}>
-          Datecode 추가
-        </button>
-      </div>
-
-      {uploadType === 'bulk' ? (
+      {uploadType === 'bulk' && (
         <>
           <div
             className={'dropzone' + (dragover ? ' dragover' : '')}
@@ -157,99 +146,6 @@ export default function Upload() {
             </div>
           )}
         </>
-      ) : (
-        <div className="form-card">
-          <form onSubmit={handleManualSubmit}>
-            <div className="form-row">
-              <div className="form-group">
-                <label>입고날짜 *</label>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <input type="date" value={manualForm.inbound_date}
-                    disabled={autoDate}
-                    onChange={e => handleManualChange('inbound_date', e.target.value)}
-                    style={autoDate ? { opacity: 0.7 } : {}} />
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                    <input type="checkbox" checked={autoDate} onChange={() => {
-                      const next = !autoDate;
-                      setAutoDate(next);
-                      if (next) setManualForm(f => ({ ...f, inbound_date: new Date().toISOString().slice(0, 10) }));
-                    }} />
-                    오늘
-                  </label>
-                </div>
-              </div>
-              <div className="form-group">
-                <label>SR#</label>
-                <input value={manualForm.sr_number} placeholder="SR 번호"
-                  onChange={e => handleManualChange('sr_number', e.target.value)} />
-              </div>
-            </div>
-            <div className="form-row">
-              <div className="form-group">
-                <label>Part# *</label>
-                <input value={manualForm.part_number} placeholder="Part# 입력"
-                  onChange={e => handleManualChange('part_number', e.target.value)} />
-              </div>
-              <div className="form-group">
-                <label>Q'ty *</label>
-                <input type="number" min="1" value={manualForm.quantity} placeholder="수량"
-                  onChange={e => handleManualChange('quantity', e.target.value)} />
-              </div>
-            </div>
-            <div className="form-row">
-              <div className="form-group">
-                <label>Datecode</label>
-                <input value={manualForm.datecode} placeholder="예: 202538 (YYYYWW)"
-                  onChange={e => handleManualChange('datecode', e.target.value)} />
-              </div>
-              <div className="form-group">
-                <label>담당 Sales</label>
-                <input value={manualForm.sales_person} placeholder="담당자명"
-                  onChange={e => handleManualChange('sales_person', e.target.value)} />
-              </div>
-            </div>
-            <div className="form-row">
-              <div className="form-group">
-                <label>Customer</label>
-                <input value={manualForm.customer} placeholder="고객명"
-                  onChange={e => handleManualChange('customer', e.target.value)} />
-              </div>
-              <div className="form-group" />
-            </div>
-            {manualError && <div style={{ color: '#ff4757', marginBottom: 16, fontWeight: 600 }}>{manualError}</div>}
-            {manualSuccess && <div style={{ color: '#2e7d32', marginBottom: 16, fontWeight: 600 }}>{manualSuccess}</div>}
-            <button type="submit" className="btn btn-primary" disabled={manualLoading}>
-              {manualLoading ? '등록 중...' : '입고 등록'}
-            </button>
-          </form>
-
-          {todayEntries.length > 0 && (
-            <div style={{ marginTop: 24 }}>
-              <h4 style={{ marginBottom: 8 }}>오늘 입고 내역 ({todayEntries.length}건)</h4>
-              <div style={{ overflowX: 'auto' }}>
-                <table className="data-table">
-                  <thead>
-                    <tr>
-                      <th>SR#</th><th>Part#</th><th>Q'ty</th><th>Datecode</th><th>Sales</th><th>Customer</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {todayEntries.map(r => (
-                      <tr key={r.id}>
-                        <td>{r.sr_number || '-'}</td>
-                        <td style={{ fontWeight: 600 }}>{r.part_number}</td>
-                        <td style={{ textAlign: 'right' }}>{(r.quantity || 0).toLocaleString()}</td>
-                        <td>{r.datecode || '-'}</td>
-                        <td>{r.sales_person || '-'}</td>
-                        <td>{r.customer || '-'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-        </div>
       )}
     </div>
   );

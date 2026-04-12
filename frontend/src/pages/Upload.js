@@ -1,16 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { uploadDatecode, uploadProductMaster, uploadShipping, checkExisting, createManualEntry, getTodayEntries } from '../api/client';
+import { uploadBulk, createManualEntry, getTodayEntries } from '../api/client';
 
 export default function Upload() {
   const [dragover, setDragover] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [results, setResults] = useState(null);
+  const [bulkResult, setBulkResult] = useState(null);
   const [error, setError] = useState('');
-  const [showConfirm, setShowConfirm] = useState(false);
-  const [pendingFile, setPendingFile] = useState(null);
-  const [uploadType, setUploadType] = useState('datecode');
-  const [masterResult, setMasterResult] = useState(null);
-  const [shippingResult, setShippingResult] = useState(null);
+  const [uploadType, setUploadType] = useState('bulk');
   const fileRef = useRef(null);
 
   // 수기입력 상태
@@ -39,7 +35,7 @@ export default function Upload() {
     setManualLoading(true);
     try {
       const res = await createManualEntry({ ...manualForm, quantity: qty });
-      setManualSuccess(`✅ ${res.data.message} (ID: ${res.data.id})`);
+      setManualSuccess(`${res.data.message} (ID: ${res.data.id})`);
       setManualForm(f => ({
         inbound_date: autoDate ? new Date().toISOString().slice(0, 10) : f.inbound_date,
         sr_number: '', part_number: '', quantity: '', datecode: '', sales_person: '', customer: '',
@@ -49,7 +45,7 @@ export default function Upload() {
     finally { setManualLoading(false); }
   };
 
-  const resetResults = () => { setResults(null); setMasterResult(null); setShippingResult(null); setError(''); setManualSuccess(''); setManualError(''); };
+  const resetResults = () => { setBulkResult(null); setError(''); setManualSuccess(''); setManualError(''); };
 
   const handleFile = async (file) => {
     if (!file) return;
@@ -58,86 +54,94 @@ export default function Upload() {
       return;
     }
     resetResults();
-
-    if (uploadType === 'datecode') {
-      try {
-        const chk = await checkExisting();
-        if (chk.data.exists) { setPendingFile(file); setShowConfirm(true); return; }
-      } catch {}
-      doUploadDC(file, false);
-    } else if (uploadType === 'master') {
-      doUploadMaster(file);
-    } else {
-      doUploadShipping(file);
-    }
-  };
-
-  const doUploadDC = async (file, overwrite) => {
-    setUploading(true); setShowConfirm(false);
-    try {
-      const res = await uploadDatecode(file, overwrite);
-      setResults(res.data);
-    } catch (err) { setError(err.response?.data?.detail || '업로드 중 오류'); }
-    finally { setUploading(false); setPendingFile(null); }
-  };
-
-  const doUploadMaster = async (file) => {
     setUploading(true);
     try {
-      const res = await uploadProductMaster(file);
-      setMasterResult(res.data);
-    } catch (err) { setError(err.response?.data?.detail || '업로드 중 오류'); }
-    finally { setUploading(false); }
-  };
-
-  const doUploadShipping = async (file) => {
-    setUploading(true);
-    try {
-      const res = await uploadShipping(file, true);
-      setShippingResult(res.data);
-    } catch (err) { setError(err.response?.data?.detail || '업로드 중 오류'); }
+      const res = await uploadBulk(file, true);
+      setBulkResult(res.data);
+    } catch (err) { setError(err.response?.data?.detail || '업로드 중 오류가 발생했습니다.'); }
     finally { setUploading(false); }
   };
 
   const onDrop = (e) => { e.preventDefault(); setDragover(false); handleFile(e.dataTransfer.files[0]); };
 
-  const typeLabels = {
-    manual: { name: 'Datecode 추가', icon: '📝', hint: '입고 데이터 직접 입력' },
-    datecode: { name: 'DATECODE', icon: '📄', hint: '영업1실/영업2실 자동 감지' },
-    master: { name: 'Mar inventory', icon: '📊', hint: '헤더 2행, 데이터 3행부터. Part# UPSERT' },
-    shipping: { name: 'Shipping management', icon: '🚚', hint: '기존 출고 이력 일괄 임포트 (73,000건+)' },
-  };
-  const cur = typeLabels[uploadType];
-
   return (
     <div>
-      <h1 className="page-title">⬆️ 데이터 업로드</h1>
+      <h1 className="page-title">데이터 업로드</h1>
 
       <div style={{ marginBottom: 20, display: 'flex', gap: 12 }}>
-        {Object.entries(typeLabels).map(([key, val]) => (
-          <button key={key}
-            className={'btn btn-sm ' + (uploadType === key ? 'btn-primary' : 'btn-outline')}
-            onClick={() => { setUploadType(key); resetResults(); }}
-          >
-            {val.icon} {val.name}
-          </button>
-        ))}
+        <button className={'btn btn-sm ' + (uploadType === 'bulk' ? 'btn-primary' : 'btn-outline')}
+          onClick={() => { setUploadType('bulk'); resetResults(); }}>
+          대량업로드
+        </button>
+        <button className={'btn btn-sm ' + (uploadType === 'manual' ? 'btn-primary' : 'btn-outline')}
+          onClick={() => { setUploadType('manual'); resetResults(); }}>
+          Datecode 추가
+        </button>
       </div>
 
-      {uploadType !== 'manual' ? (
-        <div
-          className={'dropzone' + (dragover ? ' dragover' : '')}
-          onDragOver={(e) => { e.preventDefault(); setDragover(true); }}
-          onDragLeave={() => setDragover(false)}
-          onDrop={onDrop}
-          onClick={() => fileRef.current?.click()}
-        >
-          <div className="icon">{cur.icon}</div>
-          <p>{uploading ? '업로드 중... (대용량은 1~2분 소요)' : cur.name + ' 파일을 드래그 앤 드롭하세요'}</p>
-          <p className="hint">.xlsx 파일 | {cur.hint}</p>
-          <input ref={fileRef} type="file" accept=".xlsx,.xls" style={{ display: 'none' }}
-            onChange={e => handleFile(e.target.files[0])} />
-        </div>
+      {uploadType === 'bulk' ? (
+        <>
+          <div
+            className={'dropzone' + (dragover ? ' dragover' : '')}
+            onDragOver={(e) => { e.preventDefault(); setDragover(true); }}
+            onDragLeave={() => setDragover(false)}
+            onDrop={onDrop}
+            onClick={() => fileRef.current?.click()}
+          >
+            <div className="icon">📦</div>
+            <p>{uploading ? '업로드 중... (대용량은 1~2분 소요)' : '엑셀 파일을 드래그 앤 드롭하세요'}</p>
+            <p className="hint">.xlsx 파일 | Mar inventory · DATECODE · Shipping 시트를 자동 감지하여 한번에 처리합니다</p>
+            <input ref={fileRef} type="file" accept=".xlsx,.xls" style={{ display: 'none' }}
+              onChange={e => { handleFile(e.target.files[0]); e.target.value = ''; }} />
+          </div>
+
+          {error && <div style={{ color: '#ff4757', marginTop: 16, fontWeight: 600 }}>{error}</div>}
+
+          {bulkResult && (
+            <div className="upload-results">
+              {bulkResult.master && (
+                <div className="result-card">
+                  <h4>Mar inventory</h4>
+                  <div className="result-stats">
+                    <div className="result-stat"><div className="num">{bulkResult.master.total}</div><div className="label">총 품목</div></div>
+                    <div className="result-stat"><div className="num" style={{ color: '#2e7d32' }}>{bulkResult.master.inserted}</div><div className="label">등록</div></div>
+                    <div className="result-stat"><div className="num">{bulkResult.master.has_stock}</div><div className="label">재고보유</div></div>
+                    <div className="result-stat"><div className="num" style={{ color: '#6c63ff' }}>{bulkResult.master.daily || 0}</div><div className="label">일별입출고</div></div>
+                    <div className="result-stat"><div className="num" style={{ color: '#ff4757' }}>{bulkResult.master.errors}</div><div className="label">오류</div></div>
+                  </div>
+                </div>
+              )}
+
+              {bulkResult.datecode && bulkResult.datecode.length > 0 && bulkResult.datecode.map((r, i) => (
+                <div key={i} className="result-card">
+                  <h4>DATECODE — {r.sales_team}</h4>
+                  <div className="result-stats">
+                    <div className="result-stat"><div className="num">{r.total}</div><div className="label">총 건수</div></div>
+                    <div className="result-stat"><div className="num" style={{ color: '#2e7d32' }}>{r.available}</div><div className="label">사용가능</div></div>
+                    <div className="result-stat"><div className="num" style={{ color: '#666' }}>{r.completed}</div><div className="label">완료</div></div>
+                    <div className="result-stat"><div className="num" style={{ color: '#c62828' }}>{r.critical}</div><div className="label">긴급(2년+)</div></div>
+                    <div className="result-stat"><div className="num" style={{ color: '#ff4757' }}>{r.errors}</div><div className="label">오류</div></div>
+                  </div>
+                </div>
+              ))}
+
+              {bulkResult.shipping && (
+                <div className="result-card">
+                  <h4>Shipping management</h4>
+                  <div className="result-stats">
+                    <div className="result-stat"><div className="num">{bulkResult.shipping.total.toLocaleString()}</div><div className="label">총 건수</div></div>
+                    <div className="result-stat"><div className="num" style={{ color: '#2e7d32' }}>{bulkResult.shipping.inserted.toLocaleString()}</div><div className="label">등록</div></div>
+                    <div className="result-stat"><div className="num" style={{ color: '#ff4757' }}>{bulkResult.shipping.errors.toLocaleString()}</div><div className="label">오류</div></div>
+                  </div>
+                </div>
+              )}
+
+              {!bulkResult.master && (!bulkResult.datecode || bulkResult.datecode.length === 0) && !bulkResult.shipping && (
+                <div style={{ color: '#8892a4', padding: 20 }}>감지된 시트가 없습니다. 시트명에 "Mar inventory", "DATECODE", "shipping" 키워드가 포함되어야 합니다.</div>
+              )}
+            </div>
+          )}
+        </>
       ) : (
         <div className="form-card">
           <form onSubmit={handleManualSubmit}>
@@ -230,69 +234,6 @@ export default function Upload() {
               </div>
             </div>
           )}
-        </div>
-      )}
-
-      {error && <div style={{ color: '#ff4757', marginTop: 16, fontWeight: 600 }}>{error}</div>}
-
-      {results && (
-        <div className="upload-results">
-          {results.map((r, i) => (
-            <div key={i} className="result-card">
-              <h4>✅ {r.sales_team} 업로드 완료</h4>
-              <div className="result-stats">
-                <div className="result-stat"><div className="num">{r.total}</div><div className="label">총 건수</div></div>
-                <div className="result-stat"><div className="num" style={{ color: '#2e7d32' }}>{r.available}</div><div className="label">사용가능</div></div>
-                <div className="result-stat"><div className="num" style={{ color: '#666' }}>{r.completed}</div><div className="label">완료</div></div>
-                <div className="result-stat"><div className="num" style={{ color: '#ef6c00' }}>{r.waiting}</div><div className="label">대기</div></div>
-                <div className="result-stat"><div className="num" style={{ color: '#c62828' }}>{r.critical}</div><div className="label">긴급(2년+)</div></div>
-                <div className="result-stat"><div className="num" style={{ color: '#ff4757' }}>{r.errors}</div><div className="label">오류</div></div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {masterResult && (
-        <div className="upload-results">
-          <div className="result-card">
-            <h4>✅ Mar inventory 업로드 완료 {masterResult.year_month && '(' + masterResult.year_month + ')'}</h4>
-            <div className="result-stats">
-              <div className="result-stat"><div className="num">{masterResult.total}</div><div className="label">총 품목</div></div>
-              <div className="result-stat"><div className="num" style={{ color: '#2e7d32' }}>{masterResult.inserted}</div><div className="label">신규</div></div>
-              <div className="result-stat"><div className="num" style={{ color: '#1565c0' }}>{masterResult.updated}</div><div className="label">업데이트</div></div>
-              <div className="result-stat"><div className="num">{masterResult.has_stock}</div><div className="label">재고보유</div></div>
-              <div className="result-stat"><div className="num" style={{ color: '#6c63ff' }}>{masterResult.daily_imported || 0}</div><div className="label">일별입출고</div></div>
-              <div className="result-stat"><div className="num" style={{ color: '#ff4757' }}>{masterResult.errors}</div><div className="label">오류</div></div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {shippingResult && (
-        <div className="upload-results">
-          <div className="result-card">
-            <h4>✅ 출고 이력 임포트 완료</h4>
-            <div className="result-stats">
-              <div className="result-stat"><div className="num">{shippingResult.total.toLocaleString()}</div><div className="label">총 건수</div></div>
-              <div className="result-stat"><div className="num" style={{ color: '#2e7d32' }}>{shippingResult.inserted.toLocaleString()}</div><div className="label">삽입 성공</div></div>
-              <div className="result-stat"><div className="num" style={{ color: '#ff4757' }}>{shippingResult.errors.toLocaleString()}</div><div className="label">오류</div></div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showConfirm && (
-        <div className="modal-overlay">
-          <div className="modal">
-            <h3>⚠️ 기존 데이터 존재</h3>
-            <p>기존에 업로드된 DATECODE 데이터가 있습니다.<br />덮어쓰시겠습니까?</p>
-            <div className="modal-actions">
-              <button className="btn btn-outline" onClick={() => { setShowConfirm(false); setPendingFile(null); }}>취소</button>
-              <button className="btn btn-danger" onClick={() => doUploadDC(pendingFile, true)}>덮어쓰기</button>
-              <button className="btn btn-primary" onClick={() => doUploadDC(pendingFile, false)}>추가하기</button>
-            </div>
-          </div>
         </div>
       )}
     </div>

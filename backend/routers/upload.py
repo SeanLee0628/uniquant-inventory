@@ -475,6 +475,184 @@ def _sync_daily_inbound(conn, sales_team: str):
         )
 
 
+@router.post("/upload/bulk")
+async def upload_bulk(
+    file: UploadFile = File(...),
+    overwrite: bool = Query(True),
+):
+    """대량업로드 — 하나의 엑셀에서 Mar inventory + DATECODE + Shipping 한번에 처리"""
+    content = await file.read()
+    wb = openpyxl.load_workbook(io.BytesIO(content), read_only=True, data_only=True)
+    sheet_names = wb.sheetnames
+    results = {"sheets_found": sheet_names, "master": None, "datecode": [], "shipping": None}
+
+    # 1. Mar inventory 시트
+    ws_master = None
+    for name in sheet_names:
+        if "mar" in name.lower() or "inventory" in name.lower():
+            ws_master = wb[name]
+            break
+
+    if ws_master:
+        rows = list(ws_master.iter_rows(values_only=True))
+        if len(rows) >= 3:
+            data_rows = rows[2:]
+            year_month = ""
+            fname = file.filename or ""
+            for m in range(1, 13):
+                if f"{m}월" in fname:
+                    year_month = f"{date.today().year}-{m:02d}"
+                    break
+            if not year_month:
+                year_month = date.today().strftime("%Y-%m")
+
+            total = inserted = errors = has_stock = daily_count = 0
+            with get_db() as conn:
+                conn.execute("DELETE FROM product_master")
+                for row in data_rows:
+                    total += 1
+                    pn = safe_str(row[6]) if len(row) > 6 else ""
+                    if not pn:
+                        errors += 1
+                        continue
+                    current_qty = safe_int(row[13]) if len(row) > 13 else 0
+                    booking = safe_int(row[17]) if len(row) > 17 else 0
+                    available = safe_int(row[18]) if len(row) > 18 else (current_qty - booking)
+                    if current_qty > 0:
+                        has_stock += 1
+                    params = (
+                        safe_str(row[0]), safe_str(row[1]), safe_str(row[2]), safe_str(row[3]),
+                        safe_str(row[4]), safe_str(row[5]), pn,
+                        safe_str(row[7]) if len(row) > 7 else "",
+                        safe_str(row[8]) if len(row) > 8 else "EA",
+                        safe_str(row[9]) if len(row) > 9 else "",
+                        safe_int(row[10]) if len(row) > 10 else 0,
+                        safe_str(row[11]) if len(row) > 11 else "",
+                        safe_str(row[12]) if len(row) > 12 else "",
+                        current_qty,
+                        safe_str(row[14]) if len(row) > 14 else "",
+                        safe_str(row[15]) if len(row) > 15 else "",
+                        safe_str(row[16]) if len(row) > 16 else "",
+                        booking, available,
+                        safe_int(row[19]) if len(row) > 19 else 0,
+                        safe_int(row[20]) if len(row) > 20 else 0,
+                        safe_int(row[21]) if len(row) > 21 else 0,
+                        safe_int(row[22]) if len(row) > 22 else 0,
+                        safe_int(row[23]) if len(row) > 23 else 0,
+                        safe_int(row[24]) if len(row) > 24 else 0,
+                        safe_int(row[25]) if len(row) > 25 else 0,
+                        safe_int(row[26]) if len(row) > 26 else 0,
+                        safe_int(row[27]) if len(row) > 27 else 0,
+                        safe_int(row[28]) if len(row) > 28 else 0,
+                        safe_int(row[29]) if len(row) > 29 else 0,
+                    )
+                    conn.execute("""
+                        INSERT INTO product_master (
+                            central, sales_team, vender, sr_code, family, did,
+                            part_number, mobis_id, unit, site, moq, package, fab,
+                            current_qty, sales_person, customer, crd, booking, available_qty,
+                            dc_2019, dc_2020, dc_2021, dc_2022, dc_2023,
+                            dc_2024, dc_2025, dc_2026,
+                            total_inbound, total_outbound, prev_month_balance
+                        ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                    """, params)
+                    inserted += 1
+
+                # 일별 입출고
+                for row in data_rows:
+                    pn = safe_str(row[6]) if len(row) > 6 else ""
+                    if not pn or len(row) <= 61:
+                        continue
+                    for d_num in range(1, 32):
+                        in_col = 29 + d_num
+                        out_col = 60 + d_num
+                        in_qty = safe_int(row[in_col]) if len(row) > in_col else 0
+                        out_qty = safe_int(row[out_col]) if len(row) > out_col else 0
+                        if in_qty > 0 or out_qty > 0:
+                            conn.execute(
+                                """INSERT INTO daily_inventory (part_number, year_month, day, inbound_qty, outbound_qty)
+                                   VALUES (?, ?, ?, ?, ?)
+                                   ON CONFLICT(part_number, year_month, day)
+                                   DO UPDATE SET inbound_qty = excluded.inbound_qty,
+                                                outbound_qty = excluded.outbound_qty""",
+                                (pn, year_month, d_num, in_qty, out_qty),
+                            )
+                            daily_count += 1
+
+            results["master"] = {"total": total, "inserted": inserted, "errors": errors, "has_stock": has_stock, "daily": daily_count, "year_month": year_month}
+
+    # 2. DATECODE 시트들
+    with get_db() as conn:
+        if overwrite:
+            conn.execute("DELETE FROM datecode_inventory")
+
+        for sheet_name in sheet_names:
+            if "datecode" not in sheet_name.lower():
+                continue
+            ws_dc = wb[sheet_name]
+            rows_dc = list(ws_dc.iter_rows(values_only=True))
+            if len(rows_dc) < 2:
+                continue
+            headers = [safe_str(h) for h in rows_dc[0]]
+            team = detect_sales_team(sheet_name, headers)
+            if team is None:
+                if "1" in sheet_name: team = "영업1실"
+                elif "2" in sheet_name: team = "영업2실"
+                else: continue
+            parser = parse_team1_row if team == "영업1실" else parse_team2_row
+            res = {"sales_team": team, "total": 0, "available": 0, "completed": 0, "errors": 0, "critical": 0}
+            for row in rows_dc[1:]:
+                res["total"] += 1
+                parsed = parser(row)
+                if parsed is None:
+                    res["errors"] += 1
+                    continue
+                conn.execute(INSERT_DC_SQL, parsed)
+                if parsed["status"] == "완료": res["completed"] += 1
+                else: res["available"] += 1
+                if parsed["urgency"] == "critical": res["critical"] += 1
+            results["datecode"].append(res)
+
+    # 3. Shipping 시트
+    ws_ship = None
+    for name in sheet_names:
+        if "shipping" in name.lower():
+            ws_ship = wb[name]
+            break
+
+    if ws_ship:
+        rows_ship = list(ws_ship.iter_rows(values_only=True))
+        ship_total = ship_inserted = ship_errors = 0
+        with get_db() as conn:
+            if overwrite:
+                conn.execute("DELETE FROM shipment_log")
+            for row in rows_ship[1:]:
+                ship_total += 1
+                pn = safe_str(row[2]) if len(row) > 2 else ""
+                qty = safe_int(row[3]) if len(row) > 3 else 0
+                if not pn or qty <= 0:
+                    ship_errors += 1
+                    continue
+                ship_date_val = safe_date(row[0]) if row[0] else ""
+                customer = safe_str(row[1]) if len(row) > 1 else ""
+                sales = safe_str(row[4]) if len(row) > 4 else ""
+                lot = safe_str(row[5]) if len(row) > 5 else ""
+                dc = safe_str(row[6]) if len(row) > 6 else ""
+                if lot == ".": lot = ""
+                if dc == ".": dc = ""
+                conn.execute(
+                    """INSERT INTO shipment_log
+                       (ship_date, customer, part_number, quantity, sales_person, lot_number, datecode)
+                       VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                    (ship_date_val, customer, pn, qty, sales, lot, dc),
+                )
+                ship_inserted += 1
+        results["shipping"] = {"total": ship_total, "inserted": ship_inserted, "errors": ship_errors}
+
+    wb.close()
+    return results
+
+
 @router.get("/upload/check-existing")
 def check_existing():
     with get_db() as conn:

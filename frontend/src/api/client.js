@@ -44,6 +44,11 @@ export const uploadProductMaster = (file) => {
   return api.post('/upload/master', form, { timeout: 120000 });
 };
 export const checkExisting = () => api.get('/upload/check-existing');
+export const uploadBulk = (file, overwrite = true) => {
+  const form = new FormData();
+  form.append('file', file);
+  return api.post(`/upload/bulk?overwrite=${overwrite}`, form, { timeout: 300000 });
+};
 export const uploadShipping = (file, overwrite = false) => {
   const form = new FormData();
   form.append('file', file);

@@ -206,7 +206,13 @@ def list_inventory_grouped(
                 FROM datecode_inventory di
                 LEFT JOIN {pm_sub}
                 WHERE {where}
-                GROUP BY di.part_number
+                GROUP BY di.part_number,
+                         pm.central, pm.pm_sales_team, pm.family, pm.vender, pm.sr_code, pm.did,
+                         pm.customer, pm.mobis_id, pm.unit, pm.site, pm.moq, pm.package, pm.fab,
+                         pm.current_qty, pm.pm_sales, pm.crd, pm.booking, pm.available_qty,
+                         pm.dc_2019, pm.dc_2020, pm.dc_2021, pm.dc_2022, pm.dc_2023,
+                         pm.dc_2024, pm.dc_2025, pm.dc_2026,
+                         pm.total_inbound, pm.total_outbound, pm.prev_month_balance
                 HAVING SUM(di.actual_stock) > 0
                 ORDER BY {order_col} {sort_dir}
                 LIMIT ? OFFSET ?""",

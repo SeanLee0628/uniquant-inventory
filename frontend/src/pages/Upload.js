@@ -1,13 +1,26 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { uploadBulk, createManualEntry, getTodayEntries } from '../api/client';
 
+const UPLOAD_PIN = '5850';
+
 export default function Upload() {
   const [dragover, setDragover] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [bulkResult, setBulkResult] = useState(null);
   const [error, setError] = useState('');
   const [uploadType, setUploadType] = useState('bulk');
+  const [authenticated, setAuthenticated] = useState(false);
   const fileRef = useRef(null);
+
+  const checkPin = () => {
+    const pin = prompt('이희서 매니저 휴대전화 뒷4자리는?');
+    if (pin === UPLOAD_PIN) {
+      setAuthenticated(true);
+      return true;
+    }
+    if (pin !== null) alert('비밀번호가 틀렸습니다.');
+    return false;
+  };
 
   // 수기입력 상태
   const [manualForm, setManualForm] = useState({
@@ -32,6 +45,7 @@ export default function Upload() {
     const qty = parseInt(manualForm.quantity, 10);
     if (isNaN(qty) || qty <= 0) { setManualError('수량은 1 이상이어야 합니다.'); return; }
     if (!manualForm.inbound_date) { setManualError('입고날짜를 입력해주세요.'); return; }
+    if (!authenticated && !checkPin()) return;
     setManualLoading(true);
     try {
       const res = await createManualEntry({ ...manualForm, quantity: qty });
@@ -53,6 +67,7 @@ export default function Upload() {
       setError('엑셀 파일(.xlsx)만 업로드 가능합니다.');
       return;
     }
+    if (!authenticated && !checkPin()) return;
     resetResults();
     setUploading(true);
     try {

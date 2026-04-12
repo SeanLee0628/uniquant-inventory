@@ -496,7 +496,7 @@ def add_inbound(data: dict):
                     """INSERT INTO daily_inventory (part_number, year_month, day, inbound_qty)
                        VALUES (?, ?, ?, ?)
                        ON CONFLICT(part_number, year_month, day)
-                       DO UPDATE SET inbound_qty = inbound_qty + excluded.inbound_qty""",
+                       DO UPDATE SET inbound_qty = daily_inventory.inbound_qty + excluded.inbound_qty""",
                     (part_number, ym, day, quantity),
                 )
             except ValueError:

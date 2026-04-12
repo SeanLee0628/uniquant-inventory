@@ -93,7 +93,7 @@ def create_manual_entry(entry: ManualDatecodeEntry):
                     """INSERT INTO daily_inventory (part_number, year_month, day, inbound_qty)
                        VALUES (?, ?, ?, ?)
                        ON CONFLICT(part_number, year_month, day)
-                       DO UPDATE SET inbound_qty = inbound_qty + excluded.inbound_qty""",
+                       DO UPDATE SET inbound_qty = daily_inventory.inbound_qty + excluded.inbound_qty""",
                     (entry.part_number, ym, day, entry.quantity),
                 )
             except (ValueError, TypeError):
@@ -158,7 +158,7 @@ def create_bulk_entry(payload: BulkDatecodeEntry):
                             """INSERT INTO daily_inventory (part_number, year_month, day, inbound_qty)
                                VALUES (?, ?, ?, ?)
                                ON CONFLICT(part_number, year_month, day)
-                               DO UPDATE SET inbound_qty = inbound_qty + excluded.inbound_qty""",
+                               DO UPDATE SET inbound_qty = daily_inventory.inbound_qty + excluded.inbound_qty""",
                             (entry.part_number, ym, day, entry.quantity),
                         )
                     except (ValueError, TypeError):

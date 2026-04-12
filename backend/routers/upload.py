@@ -470,7 +470,7 @@ def _sync_daily_inbound(conn, sales_team: str):
             """INSERT INTO daily_inventory (part_number, year_month, day, inbound_qty)
                VALUES (?, ?, ?, ?)
                ON CONFLICT(part_number, year_month, day)
-               DO UPDATE SET inbound_qty = inbound_qty + excluded.inbound_qty""",
+               DO UPDATE SET inbound_qty = daily_inventory.inbound_qty + excluded.inbound_qty""",
             (r["part_number"], ym, day, r["quantity"]),
         )
 
@@ -556,7 +556,7 @@ async def upload_shipping(
                         """INSERT INTO daily_inventory (part_number, year_month, day, outbound_qty)
                            VALUES (?, ?, ?, ?)
                            ON CONFLICT(part_number, year_month, day)
-                           DO UPDATE SET outbound_qty = outbound_qty + excluded.outbound_qty""",
+                           DO UPDATE SET outbound_qty = daily_inventory.outbound_qty + excluded.outbound_qty""",
                         (pn, ym, day, qty),
                     )
                 except (ValueError, TypeError):

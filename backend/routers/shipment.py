@@ -211,7 +211,7 @@ def create_shipment(data: dict):
                 """INSERT INTO daily_inventory (part_number, year_month, day, outbound_qty)
                    VALUES (?, ?, ?, ?)
                    ON CONFLICT(part_number, year_month, day)
-                   DO UPDATE SET outbound_qty = outbound_qty + excluded.outbound_qty""",
+                   DO UPDATE SET outbound_qty = daily_inventory.outbound_qty + excluded.outbound_qty""",
                 (part_number, ym, day, quantity),
             )
         except ValueError:

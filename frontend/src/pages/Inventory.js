@@ -60,8 +60,10 @@ export default function Inventory() {
   const [expandedLotId, setExpandedLotId] = useState(null);
   const [lotDaily, setLotDaily] = useState(null);
   const [dailyMonth, setDailyMonth] = useState('');
+  const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
+    setLoading(true);
     try {
       const params = { page, page_size: pageSize, ...filters };
       Object.keys(params).forEach(k => { if (!params[k]) delete params[k]; });
@@ -69,6 +71,7 @@ export default function Inventory() {
       setItems(res.data.items);
       setTotal(res.data.total);
     } catch { setItems([]); setTotal(0); }
+    finally { setLoading(false); }
   }, [page, pageSize, filters]);
 
   useEffect(() => { load(); }, [load]);
@@ -390,7 +393,15 @@ export default function Inventory() {
                 </React.Fragment>
               ))}
               {items.length === 0 && (
-                <tr><td colSpan={36} style={{ textAlign: 'center', padding: 40, color: '#aaa' }}>데이터가 없습니다</td></tr>
+                <tr><td colSpan={36} style={{ textAlign: 'center', padding: 40, color: '#aaa' }}>
+                  {loading ? (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+                      <div style={{ width: 24, height: 24, border: '3px solid #e0e0e0', borderTopColor: '#6c63ff', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                      로딩 중...
+                      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+                    </div>
+                  ) : '데이터가 없습니다'}
+                </td></tr>
               )}
             </tbody>
           </table>

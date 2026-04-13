@@ -80,9 +80,9 @@ export default function Inventory() {
   useEffect(() => { load(); }, [load]);
 
   // 컬럼별 필터 적용 (정확 매칭, trim)
-  const filteredItems = allItems.filter(row => {
-    for (const [col, val] of Object.entries(colFilters)) {
-      if (!val) continue;
+  const activeFilters = Object.entries(colFilters).filter(([,v]) => v);
+  const filteredItems = activeFilters.length === 0 ? allItems : allItems.filter(row => {
+    for (const [col, val] of activeFilters) {
       const cellVal = String(row[col] ?? '').trim();
       const filterVal = String(val).trim();
       if (cellVal !== filterVal) return false;

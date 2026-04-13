@@ -305,8 +305,8 @@ export default function Inventory() {
               })()}
             </thead>
             <tbody>
-              {items.map(row => (
-                <React.Fragment key={row.part_number}>
+              {items.map((row, idx) => (
+                <React.Fragment key={`${row.part_number}-${idx}`}>
                   {/* Part# 그룹 행 */}
                   <tr className={'urgency-' + row.worst_urgency}
                       style={{ cursor: 'pointer' }}

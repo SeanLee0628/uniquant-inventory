@@ -192,12 +192,10 @@ def list_inventory_grouped(
                     ) di ON pm.part_number = di.di_pn"""
 
         count_row = conn.execute(
-            f"""SELECT COUNT(*) as cnt FROM (
-                SELECT DISTINCT pm.part_number
+            f"""SELECT COUNT(*) as cnt
                 FROM product_master pm
                 {di_sub}
-                WHERE {where}
-            )""",
+                WHERE {where}""",
             params,
         ).fetchone()
 

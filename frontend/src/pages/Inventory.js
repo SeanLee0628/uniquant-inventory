@@ -208,6 +208,12 @@ export default function Inventory() {
       <div className="table-container">
         <div className="table-toolbar">
           <button className="btn btn-sm btn-outline" onClick={() => { setColFilters({}); setPage(1); }}>필터 초기화</button>
+          {Object.entries(colFilters).filter(([,v]) => v).map(([col, val]) => (
+            <span key={col} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 10px', background: '#6c63ff', color: '#fff', borderRadius: 12, fontSize: 12, fontWeight: 600 }}>
+              {col}: {val}
+              <span style={{ cursor: 'pointer', marginLeft: 4 }} onClick={() => updateColFilter(col, '')}>×</span>
+            </span>
+          ))}
           <div className="spacer" />
           <button className="btn btn-sm btn-success" onClick={handleExport} disabled={exporting}>
             {exporting ? '다운로드 중...' : '엑셀 내보내기'}

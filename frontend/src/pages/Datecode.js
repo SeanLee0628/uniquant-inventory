@@ -87,7 +87,7 @@ export default function Datecode() {
 
   return (
     <div>
-      <h1 className="page-title">📄 DATECODE 원장</h1>
+      <h1 className="page-title">DATECODE (입고 추가)</h1>
 
       {/* 영업실 탭 + 입고 버튼 */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 16, alignItems: 'center' }}>

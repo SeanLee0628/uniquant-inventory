@@ -4,7 +4,7 @@ const menuItems = [
   { key: 'shipment', icon: '🚚', label: '출고 입력' },
   { key: 'dashboard', icon: '📊', label: '대시보드' },
   { key: 'inventory', icon: '📦', label: '재고 현황' },
-  { key: 'datecode', icon: '📄', label: 'DATECODE' },
+  { key: 'datecode', icon: '📄', label: 'DATECODE (입고추가)' },
   { key: 'history', icon: '📋', label: '출고 이력' },
   { key: 'upload', icon: '⬆️', label: '데이터 업로드' },
   { key: 'export', icon: '🔍', label: '재고 인사이트' },

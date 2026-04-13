@@ -155,26 +155,17 @@ def list_inventory_grouped(
     params = []
 
     if sales_team:
-        conditions.append("di.sales_team = ?")
+        conditions.append("pm.sales_team = ?")
         params.append(sales_team)
-    if status:
-        conditions.append("di.status = ?")
-        params.append(status)
-    if urgency:
-        conditions.append("di.urgency = ?")
-        params.append(urgency)
     if search:
         conditions.append(
-            "(di.part_number LIKE ? OR di.sr_number LIKE ? OR di.customer LIKE ? OR di.sales_person LIKE ? OR pm.family LIKE ? OR pm.vender LIKE ? OR pm.customer LIKE ?)"
+            "(pm.part_number LIKE ? OR pm.sr_code LIKE ? OR pm.customer LIKE ? OR pm.sales_person LIKE ? OR pm.family LIKE ? OR pm.vender LIKE ?)"
         )
-        for _ in range(7):
+        for _ in range(6):
             params.append(f"%{search}%")
 
     where = " AND ".join(conditions) if conditions else "1=1"
     offset = (page - 1) * page_size
-
-    # urgency 정렬용 CASE
-    urgency_order = "CASE WHEN di.urgency='critical' THEN 3 WHEN di.urgency='warning' THEN 2 ELSE 1 END"
 
     sort_map = {
         "part_number": "di.part_number",
@@ -187,50 +178,58 @@ def list_inventory_grouped(
     order_col = sort_map.get(sort_by, "total_stock")
 
     with get_db() as conn:
-        pm_sub = """(SELECT part_number, central, sales_team as pm_sales_team, family, vender,
-                     sr_code, did, mobis_id, unit, site, moq, package, fab,
-                     current_qty, sales_person as pm_sales, customer, crd, booking, available_qty,
-                     dc_2019, dc_2020, dc_2021, dc_2022, dc_2023, dc_2024, dc_2025, dc_2026,
-                     total_inbound, total_outbound, prev_month_balance,
-                     ROW_NUMBER() OVER (PARTITION BY part_number ORDER BY id DESC) as rn
-                     FROM product_master) pm ON di.part_number = pm.part_number AND pm.rn = 1"""
+        di_sub = """LEFT JOIN (
+                        SELECT part_number as di_pn,
+                               COALESCE(SUM(actual_stock), 0) as total_stock,
+                               COALESCE(SUM(CASE WHEN actual_stock > 0 THEN out_quantity ELSE 0 END), 0) as total_out_qty,
+                               COALESCE(SUM(CASE WHEN actual_stock > 0 THEN 1 ELSE 0 END), 0) as lot_count,
+                               COALESCE(MAX(CASE WHEN actual_stock > 0 THEN days_elapsed ELSE 0 END), 0) as max_days,
+                               COALESCE(SUM(CASE WHEN actual_stock > 0 THEN amount_krw ELSE 0 END), 0) as total_krw,
+                               COALESCE(MAX(CASE WHEN urgency='critical' AND actual_stock > 0 THEN 3
+                                    WHEN urgency='warning' AND actual_stock > 0 THEN 2 ELSE 1 END), 0) as worst_urgency
+                        FROM datecode_inventory
+                        GROUP BY part_number
+                    ) di ON pm.part_number = di.di_pn"""
 
         count_row = conn.execute(
             f"""SELECT COUNT(*) as cnt FROM (
-                SELECT di.part_number
-                FROM datecode_inventory di
-                LEFT JOIN {pm_sub}
+                SELECT DISTINCT pm.part_number
+                FROM product_master pm
+                {di_sub}
                 WHERE {where}
-                GROUP BY di.part_number
             )""",
             params,
         ).fetchone()
 
+        sort_map_pm = {
+            "part_number": "pm.part_number",
+            "total_stock": "COALESCE(di.total_stock, 0)",
+            "lot_count": "COALESCE(di.lot_count, 0)",
+            "max_days": "COALESCE(di.max_days, 0)",
+            "total_krw": "COALESCE(di.total_krw, 0)",
+            "worst_urgency": "COALESCE(di.worst_urgency, 0)",
+        }
+        order_expr = sort_map_pm.get(sort_by, "COALESCE(di.total_stock, 0)")
+
         rows = conn.execute(
-            f"""SELECT di.part_number,
-                       SUM(di.actual_stock) as total_stock,
-                       SUM(CASE WHEN di.actual_stock > 0 THEN di.out_quantity ELSE 0 END) as total_out_qty,
-                       SUM(CASE WHEN di.actual_stock > 0 THEN 1 ELSE 0 END) as lot_count,
-                       MAX(CASE WHEN di.actual_stock > 0 THEN di.days_elapsed ELSE 0 END) as max_days,
-                       SUM(CASE WHEN di.actual_stock > 0 THEN di.amount_krw ELSE 0 END) as total_krw,
-                       MAX(CASE WHEN di.actual_stock > 0 THEN {urgency_order} ELSE 0 END) as worst_urgency,
-                       pm.central, pm.pm_sales_team, pm.family, pm.vender, pm.sr_code, pm.did,
-                       pm.customer as pm_customer, pm.mobis_id, pm.unit, pm.site, pm.moq, pm.package, pm.fab,
-                       pm.current_qty, pm.pm_sales, pm.crd, pm.booking, pm.available_qty,
+            f"""SELECT pm.part_number, pm.central, pm.sales_team as pm_sales_team,
+                       pm.family, pm.vender, pm.sr_code, pm.did,
+                       pm.customer as pm_customer, pm.mobis_id, pm.unit, pm.site,
+                       pm.moq, pm.package, pm.fab, pm.current_qty,
+                       pm.sales_person as pm_sales, pm.crd, pm.booking, pm.available_qty,
                        pm.dc_2019, pm.dc_2020, pm.dc_2021, pm.dc_2022, pm.dc_2023,
                        pm.dc_2024, pm.dc_2025, pm.dc_2026,
-                       pm.total_inbound, pm.total_outbound, pm.prev_month_balance
-                FROM datecode_inventory di
-                LEFT JOIN {pm_sub}
+                       pm.total_inbound, pm.total_outbound, pm.prev_month_balance,
+                       COALESCE(di.total_stock, 0) as total_stock,
+                       COALESCE(di.total_out_qty, 0) as total_out_qty,
+                       COALESCE(di.lot_count, 0) as lot_count,
+                       COALESCE(di.max_days, 0) as max_days,
+                       COALESCE(di.total_krw, 0) as total_krw,
+                       COALESCE(di.worst_urgency, 0) as worst_urgency
+                FROM product_master pm
+                {di_sub}
                 WHERE {where}
-                GROUP BY di.part_number,
-                         pm.central, pm.pm_sales_team, pm.family, pm.vender, pm.sr_code, pm.did,
-                         pm.customer, pm.mobis_id, pm.unit, pm.site, pm.moq, pm.package, pm.fab,
-                         pm.current_qty, pm.pm_sales, pm.crd, pm.booking, pm.available_qty,
-                         pm.dc_2019, pm.dc_2020, pm.dc_2021, pm.dc_2022, pm.dc_2023,
-                         pm.dc_2024, pm.dc_2025, pm.dc_2026,
-                         pm.total_inbound, pm.total_outbound, pm.prev_month_balance
-                ORDER BY {order_col} {sort_dir}
+                ORDER BY {order_expr} {sort_dir}
                 LIMIT ? OFFSET ?""",
             params + [page_size, offset],
         ).fetchall()

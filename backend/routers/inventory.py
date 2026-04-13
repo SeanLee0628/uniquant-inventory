@@ -91,7 +91,7 @@ def list_inventory(
     sort_by: str = Query("di.id", pattern="^(di\\.id|di\\.part_number|di\\.datecode|di\\.days_elapsed|di\\.actual_stock|di\\.amount_krw|di\\.status|di\\.urgency|di\\.inbound_date)$"),
     sort_dir: str = Query("desc", pattern="^(asc|desc)$"),
     page: int = Query(1, ge=1),
-    page_size: int = Query(50, ge=1, le=500),
+    page_size: int = Query(50, ge=1, le=10000),
 ):
     conditions = []
     params = []
@@ -148,7 +148,7 @@ def list_inventory_grouped(
     sort_by: str = Query("total_stock", pattern="^(part_number|total_stock|lot_count|max_days|total_krw|worst_urgency)$"),
     sort_dir: str = Query("desc", pattern="^(asc|desc)$"),
     page: int = Query(1, ge=1),
-    page_size: int = Query(50, ge=1, le=500),
+    page_size: int = Query(50, ge=1, le=10000),
 ):
     """Part# 단위로 그룹핑된 재고 목록"""
     conditions = []
@@ -313,7 +313,7 @@ def get_part_lots(
 @router.get("/inventory/urgent")
 def list_urgent(
     page: int = Query(1, ge=1),
-    page_size: int = Query(50, ge=1, le=500),
+    page_size: int = Query(50, ge=1, le=10000),
 ):
     """긴급 재고만 조회 (2년 초과)"""
     offset = (page - 1) * page_size

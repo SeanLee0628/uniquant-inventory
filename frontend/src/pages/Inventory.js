@@ -60,6 +60,13 @@ export default function Inventory() {
   const [lotDaily, setLotDaily] = useState(null);
   const [dailyMonth, setDailyMonth] = useState('');
 
+  // 드롭다운 외부 클릭 닫기
+  useEffect(() => {
+    const handler = () => setOpenFilter(null);
+    document.addEventListener('click', handler);
+    return () => document.removeEventListener('click', handler);
+  }, []);
+
   // 전체 데이터 1회 로드
   const load = useCallback(async () => {
     setLoading(true);
@@ -72,12 +79,11 @@ export default function Inventory() {
 
   useEffect(() => { load(); }, [load]);
 
-  // 컬럼별 필터 적용
+  // 컬럼별 필터 적용 (정확 매칭)
   const filteredItems = allItems.filter(row => {
     for (const [col, val] of Object.entries(colFilters)) {
       if (!val) continue;
-      const cellVal = String(row[col] || '').toLowerCase();
-      if (!cellVal.includes(val.toLowerCase())) return false;
+      if (String(row[col] || '') !== val) return false;
     }
     return true;
   });
@@ -118,6 +124,23 @@ export default function Inventory() {
   const updateColFilter = (col, val) => {
     setColFilters(f => ({ ...f, [col]: val }));
     setPage(1);
+  };
+
+  // 드롭다운 필터
+  const [openFilter, setOpenFilter] = useState(null);
+
+  const getUniqueValues = (col) => {
+    const vals = new Set();
+    allItems.forEach(row => {
+      const v = row[col];
+      if (v !== null && v !== undefined && v !== '') vals.add(String(v));
+    });
+    return [...vals].sort();
+  };
+
+  const toggleFilter = (col, e) => {
+    e.stopPropagation();
+    setOpenFilter(openFilter === col ? null : col);
   };
 
   const loadLots = async (partNumber, pg = 1) => {
@@ -195,24 +218,24 @@ export default function Inventory() {
         <div style={{ overflowX: 'auto' }}>
           <table>
             <thead>
-              <tr>
-                {[
-                  { key: 'central', label: 'Central' },
-                  { key: 'sales_team', label: 'Sales team' },
-                  { key: 'vender', label: 'VENDER' },
-                  { key: 'sr_code', label: 'SR#' },
-                  { key: 'family', label: 'FAMILY' },
-                  { key: 'did', label: 'DID#' },
-                  { key: 'part_number', label: 'Part#', sort: true },
+              {(() => {
+                const cols = [
+                  { key: 'central', label: 'Central', filter: true },
+                  { key: 'sales_team', label: 'Sales team', filter: true },
+                  { key: 'vender', label: 'VENDER', filter: true },
+                  { key: 'sr_code', label: 'SR#', filter: true },
+                  { key: 'family', label: 'FAMILY', filter: true },
+                  { key: 'did', label: 'DID#', filter: true },
+                  { key: 'part_number', label: 'Part#', sort: true, filter: true },
                   { key: 'mobis_id', label: 'MOBIS ID' },
-                  { key: 'unit', label: 'unit' },
-                  { key: 'site', label: 'site' },
+                  { key: 'unit', label: 'unit', filter: true },
+                  { key: 'site', label: 'site', filter: true },
                   { key: 'moq', label: 'MOQ', sort: true },
-                  { key: 'package', label: 'Package' },
-                  { key: 'fab', label: 'FAB' },
+                  { key: 'package', label: 'Package', filter: true },
+                  { key: 'fab', label: 'FAB', filter: true },
                   { key: 'current_qty', label: "Q'ty", sort: true },
-                  { key: 'sales_person', label: 'SALES' },
-                  { key: 'customer', label: 'CUSTOMER' },
+                  { key: 'sales_person', label: 'SALES', filter: true },
+                  { key: 'customer', label: 'CUSTOMER', filter: true },
                   { key: 'crd', label: 'CRD' },
                   { key: 'booking', label: 'booking', sort: true },
                   { key: 'available_qty', label: 'available', sort: true },
@@ -232,33 +255,46 @@ export default function Inventory() {
                   { key: 'lot_count', label: '로트' },
                   { key: 'max_days', label: '경과일', sort: true },
                   { key: 'total_krw', label: '금액(KRW)', sort: true },
-                  { key: 'worst_urgency', label: '노후도' },
-                ].map(col => (
-                  <th key={col.key} style={col.sort ? { cursor: 'pointer' } : {}}
-                    onClick={col.sort ? () => handleSort(col.key) : undefined}>
-                    {col.label}{col.sort ? sortIcon(col.key) : ''}
-                  </th>
-                ))}
-              </tr>
-              <tr>
-                {[
-                  'central','sales_team','vender','sr_code','family','did','part_number',
-                  'mobis_id','unit','site','moq','package','fab','current_qty',
-                  'sales_person','customer','crd','booking','available_qty',
-                  'dc_2019','dc_2020','dc_2021','dc_2022','dc_2023','dc_2024','dc_2025','dc_2026',
-                  'total_inbound','total_outbound','prev_month_balance',
-                  'total_stock','total_out_qty','lot_count','max_days','total_krw','worst_urgency',
-                ].map(col => (
-                  <th key={col} style={{ padding: '2px 4px' }}>
-                    <input
-                      value={colFilters[col] || ''}
-                      onChange={e => updateColFilter(col, e.target.value)}
-                      placeholder="..."
-                      style={{ width: '100%', padding: '3px 4px', fontSize: 11, border: '1px solid #ddd', borderRadius: 3, background: '#fafafa' }}
-                    />
-                  </th>
-                ))}
-              </tr>
+                  { key: 'worst_urgency', label: '노후도', filter: true },
+                ];
+                return (
+                  <tr>
+                    {cols.map(col => (
+                      <th key={col.key} style={{ position: 'relative', whiteSpace: 'nowrap', cursor: col.sort ? 'pointer' : 'default' }}
+                        onClick={col.sort ? () => handleSort(col.key) : undefined}>
+                        {col.label}{col.sort ? sortIcon(col.key) : ''}
+                        {col.filter && (
+                          <span onClick={e => toggleFilter(col.key, e)}
+                            style={{ marginLeft: 4, cursor: 'pointer', fontSize: 10, color: colFilters[col.key] ? '#6c63ff' : '#bbb' }}>
+                            ▼
+                          </span>
+                        )}
+                        {colFilters[col.key] && (
+                          <span style={{ display: 'inline-block', width: 6, height: 6, background: '#6c63ff', borderRadius: '50%', marginLeft: 3, verticalAlign: 'middle' }} />
+                        )}
+                        {openFilter === col.key && (
+                          <div onClick={e => e.stopPropagation()}
+                            style={{ position: 'absolute', top: '100%', left: 0, zIndex: 100, background: '#fff', border: '1px solid #ddd',
+                              borderRadius: 6, boxShadow: '0 4px 12px rgba(0,0,0,0.15)', minWidth: 160, maxHeight: 300, overflowY: 'auto', padding: 4 }}>
+                            <div onClick={() => { updateColFilter(col.key, ''); setOpenFilter(null); }}
+                              style={{ padding: '6px 10px', cursor: 'pointer', fontWeight: 600, color: '#6c63ff', borderBottom: '1px solid #eee', fontSize: 12 }}>
+                              (전체)
+                            </div>
+                            {getUniqueValues(col.key).map(v => (
+                              <div key={v} onClick={() => { updateColFilter(col.key, v); setOpenFilter(null); }}
+                                style={{ padding: '5px 10px', cursor: 'pointer', fontSize: 12, background: colFilters[col.key] === v ? '#f0f0ff' : '#fff' }}
+                                onMouseEnter={e => e.target.style.background = '#f5f5f5'}
+                                onMouseLeave={e => e.target.style.background = colFilters[col.key] === v ? '#f0f0ff' : '#fff'}>
+                                {v}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </th>
+                    ))}
+                  </tr>
+                );
+              })()}
             </thead>
             <tbody>
               {items.map(row => (

@@ -83,6 +83,10 @@ export default function Upload() {
     <div>
       <h1 className="page-title">데이터 업로드</h1>
 
+      <div style={{ padding: '12px 16px', background: '#fff3e0', borderRadius: 8, marginBottom: 16, fontSize: 13, color: '#e65100', fontWeight: 500 }}>
+        데이터 업로드 시, 경영기획팀 이희서 매니저에게 문의 바랍니다.
+      </div>
+
       {uploadType === 'bulk' && (
         <>
           <div

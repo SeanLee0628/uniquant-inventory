@@ -65,4 +65,4 @@ if FRONTEND_BUILD.exists():
         file_path = FRONTEND_BUILD / full_path
         if full_path and file_path.exists() and file_path.is_file():
             return FileResponse(str(file_path))
-        return FileResponse(str(FRONTEND_BUILD / "index.html"))
+        return FileResponse(str(FRONTEND_BUILD / "index.html"), headers={"Cache-Control": "no-cache, no-store, must-revalidate"})

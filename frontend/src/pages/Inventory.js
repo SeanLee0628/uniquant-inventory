@@ -79,11 +79,13 @@ export default function Inventory() {
 
   useEffect(() => { load(); }, [load]);
 
-  // 컬럼별 필터 적용 (정확 매칭)
+  // 컬럼별 필터 적용 (정확 매칭, trim)
   const filteredItems = allItems.filter(row => {
     for (const [col, val] of Object.entries(colFilters)) {
       if (!val) continue;
-      if (String(row[col] || '') !== val) return false;
+      const cellVal = String(row[col] ?? '').trim();
+      const filterVal = String(val).trim();
+      if (cellVal !== filterVal) return false;
     }
     return true;
   });
@@ -133,7 +135,7 @@ export default function Inventory() {
     const vals = new Set();
     allItems.forEach(row => {
       const v = row[col];
-      if (v !== null && v !== undefined && v !== '') vals.add(String(v));
+      if (v !== null && v !== undefined && v !== '') vals.add(String(v).trim());
     });
     return [...vals].sort();
   };

@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { getInventoryGrouped, getPartLots, getDailyInventory, exportInventoryExcel } from '../api/client';
+import { getInventoryGrouped, getPartLots, exportInventoryExcel } from '../api/client';
 
 const urgencyLabel = { normal: '정상', warning: '주의', critical: '긴급' };
 const urgencyTooltip = {
@@ -62,9 +62,6 @@ export default function Inventory() {
   const [dailyMonth, setDailyMonth] = useState('');
   const [loading, setLoading] = useState(true);
 
-  // Part# 단위 일별 입출고
-  const [partDaily, setPartDaily] = useState(null);
-  const [partDailyMonth, setPartDailyMonth] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -112,27 +109,12 @@ export default function Inventory() {
       setLots([]);
       setExpandedLotId(null);
       setLotDaily(null);
-      setPartDaily(null);
       return;
     }
     setExpandedPn(partNumber);
     setExpandedLotId(null);
     setLotDaily(null);
     loadLots(partNumber, 1);
-    // 일별 입출고 로드
-    try {
-      const res = await getDailyInventory(partNumber);
-      setPartDaily(res.data);
-      setPartDailyMonth(res.data.year_month || '');
-    } catch { setPartDaily(null); }
-  };
-
-  const changePartDailyMonth = async (partNumber, ym) => {
-    setPartDailyMonth(ym);
-    try {
-      const res = await getDailyInventory(partNumber, ym);
-      setPartDaily(res.data);
-    } catch {}
   };
 
   const toggleLotDaily = (id, row) => {
@@ -293,49 +275,7 @@ export default function Inventory() {
                     <tr>
                       <td colSpan={36} style={{ padding: 0, background: '#f8f9fa' }}>
                         <div style={{ padding: '8px 12px' }}>
-                          {/* 일별 입출고 */}
-                          {partDaily && partDaily.days && partDaily.days.length > 0 && (
-                            <div style={{ marginBottom: 16 }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
-                                <h4 style={{ margin: 0 }}>일별 입출고 — {row.part_number}</h4>
-                                {partDaily.available_months && partDaily.available_months.length > 0 && (
-                                  <select value={partDailyMonth}
-                                    onClick={e => e.stopPropagation()}
-                                    onChange={e => { e.stopPropagation(); changePartDailyMonth(row.part_number, e.target.value); }}
-                                    style={{ padding: '4px 8px', borderRadius: 4, border: '1px solid #ddd', fontSize: 12 }}>
-                                    {partDaily.available_months.map(m => (
-                                      <option key={m} value={m}>{m}</option>
-                                    ))}
-                                  </select>
-                                )}
-                              </div>
-                              <div className="daily-grid">
-                                <div className="daily-row daily-row-header">
-                                  <span className="daily-label"></span>
-                                  {Array.from({length: 31}, (_, i) => (
-                                    <span key={i} className="daily-cell daily-cell-header">{i + 1}</span>
-                                  ))}
-                                </div>
-                                <div className="daily-row daily-row-in">
-                                  <span className="daily-label">입고</span>
-                                  {Array.from({length: 31}, (_, i) => {
-                                    const d = partDaily.days.find(x => x.day === i + 1);
-                                    const v = d ? d.inbound : 0;
-                                    return <span key={i} className={'daily-cell' + (v > 0 ? ' has-value in' : '')}>{v > 0 ? v.toLocaleString() : ''}</span>;
-                                  })}
-                                </div>
-                                <div className="daily-row daily-row-out">
-                                  <span className="daily-label">출고</span>
-                                  {Array.from({length: 31}, (_, i) => {
-                                    const d = partDaily.days.find(x => x.day === i + 1);
-                                    const v = d ? d.outbound : 0;
-                                    return <span key={i} className={'daily-cell' + (v > 0 ? ' has-value out' : '')}>{v > 0 ? v.toLocaleString() : ''}</span>;
-                                  })}
-                                </div>
-                              </div>
-                            </div>
-                          )}
-                          <h4 style={{ margin: '0 0 8px' }}>DATECODE 로트 ({lotsTotal}건)</h4>
+                          <h4 style={{ margin: '0 0 8px' }}>DATECODE 로트 ({lotsTotal}건) — 클릭하면 입출고 내역</h4>
                           {lotsLoading ? (
                             <p style={{ color: '#888' }}>로딩 중...</p>
                           ) : (

@@ -202,7 +202,6 @@ def list_inventory_grouped(
                 LEFT JOIN {pm_sub}
                 WHERE {where}
                 GROUP BY di.part_number
-                HAVING SUM(di.actual_stock) > 0
             )""",
             params,
         ).fetchone()
@@ -231,7 +230,6 @@ def list_inventory_grouped(
                          pm.dc_2019, pm.dc_2020, pm.dc_2021, pm.dc_2022, pm.dc_2023,
                          pm.dc_2024, pm.dc_2025, pm.dc_2026,
                          pm.total_inbound, pm.total_outbound, pm.prev_month_balance
-                HAVING SUM(di.actual_stock) > 0
                 ORDER BY {order_col} {sort_dir}
                 LIMIT ? OFFSET ?""",
             params + [page_size, offset],

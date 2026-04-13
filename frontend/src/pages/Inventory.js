@@ -39,15 +39,14 @@ function buildLotDaily(row) {
 }
 
 export default function Inventory() {
-  const [items, setItems] = useState([]);
-  const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
-  const [pageSize] = useState(50);
-  const [filters, setFilters] = useState({
-    search: '', status: '', urgency: '', sales_team: '',
-    sort_by: 'total_stock', sort_dir: 'desc',
-  });
+  const [allItems, setAllItems] = useState([]);
   const [exporting, setExporting] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  // 컬럼별 필터
+  const [colFilters, setColFilters] = useState({});
+  const [sortBy, setSortBy] = useState('');
+  const [sortDir, setSortDir] = useState('desc');
 
   // Part# 확장
   const [expandedPn, setExpandedPn] = useState(null);
@@ -60,36 +59,65 @@ export default function Inventory() {
   const [expandedLotId, setExpandedLotId] = useState(null);
   const [lotDaily, setLotDaily] = useState(null);
   const [dailyMonth, setDailyMonth] = useState('');
-  const [loading, setLoading] = useState(true);
 
-
+  // 전체 데이터 1회 로드
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const params = { page, page_size: pageSize, ...filters };
-      Object.keys(params).forEach(k => { if (!params[k]) delete params[k]; });
-      const res = await getInventoryGrouped(params);
-      setItems(res.data.items);
-      setTotal(res.data.total);
-    } catch { setItems([]); setTotal(0); }
+      const res = await getInventoryGrouped({ page: 1, page_size: 9999 });
+      setAllItems(res.data.items);
+    } catch { setAllItems([]); }
     finally { setLoading(false); }
-  }, [page, pageSize, filters]);
+  }, []);
 
   useEffect(() => { load(); }, [load]);
 
-  const totalPages = Math.ceil(total / pageSize);
+  // 컬럼별 필터 적용
+  const filteredItems = allItems.filter(row => {
+    for (const [col, val] of Object.entries(colFilters)) {
+      if (!val) continue;
+      const cellVal = String(row[col] || '').toLowerCase();
+      if (!cellVal.includes(val.toLowerCase())) return false;
+    }
+    return true;
+  });
+
+  // 정렬
+  const sortedItems = [...filteredItems].sort((a, b) => {
+    if (!sortBy) return 0;
+    let va = a[sortBy], vb = b[sortBy];
+    if (typeof va === 'string') va = va.toLowerCase();
+    if (typeof vb === 'string') vb = vb.toLowerCase();
+    if (va < vb) return sortDir === 'asc' ? -1 : 1;
+    if (va > vb) return sortDir === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  // 페이지네이션
+  const pageSize = 50;
+  const [page, setPage] = useState(1);
+  const totalPages = Math.ceil(sortedItems.length / pageSize);
+  const items = sortedItems.slice((page - 1) * pageSize, page * pageSize);
+  const total = sortedItems.length;
 
   const handleSort = (col) => {
-    setFilters(f => ({
-      ...f, sort_by: col,
-      sort_dir: f.sort_by === col && f.sort_dir === 'asc' ? 'desc' : 'asc',
-    }));
+    if (sortBy === col) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortBy(col);
+      setSortDir('desc');
+    }
     setPage(1);
   };
 
   const sortIcon = (col) => {
-    if (filters.sort_by !== col) return '';
-    return filters.sort_dir === 'asc' ? ' ▲' : ' ▼';
+    if (sortBy !== col) return '';
+    return sortDir === 'asc' ? ' ▲' : ' ▼';
+  };
+
+  const updateColFilter = (col, val) => {
+    setColFilters(f => ({ ...f, [col]: val }));
+    setPage(1);
   };
 
   const loadLots = async (partNumber, pg = 1) => {
@@ -154,73 +182,82 @@ export default function Inventory() {
 
       <div className="table-container">
         <div className="table-toolbar">
-          <input placeholder="검색 (Part#, 고객, FAMILY, VENDER)"
-            value={filters.search}
-            onChange={e => { setFilters(f => ({ ...f, search: e.target.value })); setPage(1); }} />
-          <select value={filters.sales_team} onChange={e => { setFilters(f => ({ ...f, sales_team: e.target.value })); setPage(1); }}>
-            <option value="">전체 영업실</option>
-            <option value="영업1실">영업1실</option>
-            <option value="영업2실">영업2실</option>
-          </select>
-          <select value={filters.status} onChange={e => { setFilters(f => ({ ...f, status: e.target.value })); setPage(1); }}>
-            <option value="">전체 상태</option>
-            <option value="사용가능">사용가능</option>
-            <option value="완료">완료</option>
-            <option value="대기">대기</option>
-          </select>
-          <select value={filters.urgency} onChange={e => { setFilters(f => ({ ...f, urgency: e.target.value })); setPage(1); }}>
-            <option value="">전체 노후도</option>
-            <option value="normal">정상</option>
-            <option value="warning">주의</option>
-            <option value="critical">긴급</option>
-          </select>
+          <button className="btn btn-sm btn-outline" onClick={() => { setColFilters({}); setPage(1); }}>필터 초기화</button>
           <div className="spacer" />
           <button className="btn btn-sm btn-success" onClick={handleExport} disabled={exporting}>
-            {exporting ? '다운로드 중...' : '📥 엑셀 내보내기'}
+            {exporting ? '다운로드 중...' : '엑셀 내보내기'}
           </button>
-          <span style={{ fontSize: 13, color: '#888' }}>총 {total.toLocaleString()}건</span>
+          <span style={{ fontSize: 13, color: '#888' }}>
+            {total < allItems.length ? `${total.toLocaleString()} / ${allItems.length.toLocaleString()}건 (필터)` : `총 ${total.toLocaleString()}건`}
+          </span>
         </div>
 
         <div style={{ overflowX: 'auto' }}>
           <table>
             <thead>
               <tr>
-                <th>Central</th>
-                <th>Sales team</th>
-                <th>VENDER</th>
-                <th>SR#</th>
-                <th>FAMILY</th>
-                <th>DID#</th>
-                <th>Part#</th>
-                <th>MOBIS ID</th>
-                <th>unit</th>
-                <th>site</th>
-                <th>MOQ</th>
-                <th>Package</th>
-                <th>FAB</th>
-                <th style={{ cursor: 'pointer' }} onClick={() => handleSort('total_stock')}>Q'ty{sortIcon('total_stock')}</th>
-                <th>SALES</th>
-                <th>CUSTOMER</th>
-                <th>CRD</th>
-                <th>booking</th>
-                <th>available</th>
-                <th>DC 2019</th>
-                <th>DC 2020</th>
-                <th>DC 2021</th>
-                <th>DC 2022</th>
-                <th>DC 2023</th>
-                <th>DC 2024</th>
-                <th>DC 2025</th>
-                <th>DC 2026</th>
-                <th>총입고</th>
-                <th>총출고</th>
-                <th>전월</th>
-                <th>실재고</th>
-                <th>출고합</th>
-                <th>로트</th>
-                <th style={{ cursor: 'pointer' }} onClick={() => handleSort('max_days')}>경과일{sortIcon('max_days')}</th>
-                <th>금액(KRW)</th>
-                <th>노후도</th>
+                {[
+                  { key: 'central', label: 'Central' },
+                  { key: 'sales_team', label: 'Sales team' },
+                  { key: 'vender', label: 'VENDER' },
+                  { key: 'sr_code', label: 'SR#' },
+                  { key: 'family', label: 'FAMILY' },
+                  { key: 'did', label: 'DID#' },
+                  { key: 'part_number', label: 'Part#', sort: true },
+                  { key: 'mobis_id', label: 'MOBIS ID' },
+                  { key: 'unit', label: 'unit' },
+                  { key: 'site', label: 'site' },
+                  { key: 'moq', label: 'MOQ', sort: true },
+                  { key: 'package', label: 'Package' },
+                  { key: 'fab', label: 'FAB' },
+                  { key: 'current_qty', label: "Q'ty", sort: true },
+                  { key: 'sales_person', label: 'SALES' },
+                  { key: 'customer', label: 'CUSTOMER' },
+                  { key: 'crd', label: 'CRD' },
+                  { key: 'booking', label: 'booking', sort: true },
+                  { key: 'available_qty', label: 'available', sort: true },
+                  { key: 'dc_2019', label: 'DC 2019' },
+                  { key: 'dc_2020', label: 'DC 2020' },
+                  { key: 'dc_2021', label: 'DC 2021' },
+                  { key: 'dc_2022', label: 'DC 2022' },
+                  { key: 'dc_2023', label: 'DC 2023' },
+                  { key: 'dc_2024', label: 'DC 2024' },
+                  { key: 'dc_2025', label: 'DC 2025' },
+                  { key: 'dc_2026', label: 'DC 2026' },
+                  { key: 'total_inbound', label: '총입고', sort: true },
+                  { key: 'total_outbound', label: '총출고', sort: true },
+                  { key: 'prev_month_balance', label: '전월' },
+                  { key: 'total_stock', label: '실재고', sort: true },
+                  { key: 'total_out_qty', label: '출고합' },
+                  { key: 'lot_count', label: '로트' },
+                  { key: 'max_days', label: '경과일', sort: true },
+                  { key: 'total_krw', label: '금액(KRW)', sort: true },
+                  { key: 'worst_urgency', label: '노후도' },
+                ].map(col => (
+                  <th key={col.key} style={col.sort ? { cursor: 'pointer' } : {}}
+                    onClick={col.sort ? () => handleSort(col.key) : undefined}>
+                    {col.label}{col.sort ? sortIcon(col.key) : ''}
+                  </th>
+                ))}
+              </tr>
+              <tr>
+                {[
+                  'central','sales_team','vender','sr_code','family','did','part_number',
+                  'mobis_id','unit','site','moq','package','fab','current_qty',
+                  'sales_person','customer','crd','booking','available_qty',
+                  'dc_2019','dc_2020','dc_2021','dc_2022','dc_2023','dc_2024','dc_2025','dc_2026',
+                  'total_inbound','total_outbound','prev_month_balance',
+                  'total_stock','total_out_qty','lot_count','max_days','total_krw','worst_urgency',
+                ].map(col => (
+                  <th key={col} style={{ padding: '2px 4px' }}>
+                    <input
+                      value={colFilters[col] || ''}
+                      onChange={e => updateColFilter(col, e.target.value)}
+                      placeholder="..."
+                      style={{ width: '100%', padding: '3px 4px', fontSize: 11, border: '1px solid #ddd', borderRadius: 3, background: '#fafafa' }}
+                    />
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>

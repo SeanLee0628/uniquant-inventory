@@ -59,6 +59,8 @@ export const uploadShipping = (file, overwrite = false) => {
 // 내보내기
 export const exportInventoryExcel = () =>
   api.get('/export/inventory', { responseType: 'blob' });
+export const exportDatecodeExcel = (salesTeam) =>
+  api.get('/export/datecode', { params: { sales_team: salesTeam }, responseType: 'blob' });
 export const exportShipmentsExcel = (params) =>
   api.get('/export/shipments', { params, responseType: 'blob' });
 

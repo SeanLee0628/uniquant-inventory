@@ -132,6 +132,95 @@ def export_inventory_excel(year_month: Optional[str] = None):
     )
 
 
+@router.get("/export/datecode")
+def export_datecode_excel(sales_team: str = Query(...)):
+    """DATECODE 엑셀 내보내기 — 영업실별"""
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = f"DATECODE({sales_team})"
+
+    hdr_fill = PatternFill(start_color="2B5797", end_color="2B5797", fill_type="solid")
+    hdr_font = Font(color="FFFFFF", bold=True, size=9)
+    thin = Border(
+        left=Side(style="thin"), right=Side(style="thin"),
+        top=Side(style="thin"), bottom=Side(style="thin"),
+    )
+
+    headers = [
+        "입고일", "SR#", "PART#", "Q'ty", "DATECODE",
+        "담당 SALES", "CUSTOMER", "REMARK", "실재고",
+        "출고일", "출고 CUSTOMER", "출고 PART#", "출고 Q'ty",
+        "출고 SALES", "출고 REMARK", "상태",
+        "외화단가(USD)", "금액(USD)", "환율", "금액(KRW)",
+        "DC환산일", "경과일수(노후)", "경과일수(리드타임)", "노후도",
+    ]
+    for ci, h in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=ci, value=h)
+        cell.fill = hdr_fill
+        cell.font = hdr_font
+        cell.alignment = Alignment(horizontal="center")
+        cell.border = thin
+
+    with get_db() as conn:
+        rows = conn.execute(
+            """SELECT di.*, pm.customer as pm_customer
+               FROM datecode_inventory di
+               LEFT JOIN (
+                   SELECT part_number, customer,
+                          ROW_NUMBER() OVER (PARTITION BY part_number ORDER BY id DESC) as rn
+                   FROM product_master
+               ) pm ON di.part_number = pm.part_number AND pm.rn = 1
+               WHERE di.sales_team = ?
+               ORDER BY di.id""",
+            (sales_team,),
+        ).fetchall()
+
+        for ri, r in enumerate(rows, 2):
+            # 리드타임 계산
+            lead_time = None
+            if r["inbound_date"] and r["datecode_date"]:
+                try:
+                    from datetime import datetime
+                    ib = datetime.strptime(r["inbound_date"][:10], "%Y-%m-%d")
+                    dc = datetime.strptime(r["datecode_date"][:10], "%Y-%m-%d")
+                    lead_time = (ib - dc).days
+                except (ValueError, TypeError):
+                    pass
+
+            urgency_label = {"normal": "정상", "warning": "주의", "critical": "긴급"}.get(r["urgency"], "")
+            vals = [
+                r["inbound_date"] or "", r["sr_number"] or "", r["part_number"] or "",
+                r["quantity"] or 0, r["datecode"] or "",
+                r["sales_person"] or "", r["pm_customer"] or r["customer"] or "",
+                r["remark"] or "", r["actual_stock"] or 0,
+                r["outbound_date"] or "", r["out_customer"] or "",
+                r["out_part_number"] or "", r["out_quantity"] or 0,
+                r["out_sales"] or "", r["out_remark"] or "",
+                r["status"] or "",
+                r["unit_price_usd"] or 0, r["amount_usd"] or 0,
+                r["exchange_rate"] or 0, r["amount_krw"] or 0,
+                r["datecode_date"] or "", r["days_elapsed"] or 0,
+                lead_time, urgency_label,
+            ]
+            for ci, v in enumerate(vals, 1):
+                cell = ws.cell(row=ri, column=ci, value=v)
+                cell.border = thin
+
+    # 컬럼 너비
+    for ci in range(1, len(headers) + 1):
+        ws.column_dimensions[get_column_letter(ci)].width = 14
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    safe_team = sales_team.replace(" ", "_")
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename=DATECODE_{safe_team}.xlsx"},
+    )
+
+
 @router.get("/export/shipments")
 def export_shipments_excel(
     start_date: Optional[str] = None,

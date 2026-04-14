@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { getInventory, addInbound } from '../api/client';
+import { getInventory, addInbound, exportDatecodeExcel } from '../api/client';
 
 const urgencyLabel = { normal: '정상', warning: '주의', critical: '긴급' };
 const urgencyTooltip = {
@@ -103,6 +103,18 @@ export default function Datecode() {
           </button>
         ))}
         <div className="spacer" />
+        <button className="btn btn-sm btn-success"
+          onClick={async () => {
+            try {
+              const res = await exportDatecodeExcel(team);
+              const url = window.URL.createObjectURL(new Blob([res.data]));
+              const a = document.createElement('a'); a.href = url;
+              a.download = `DATECODE_${team}.xlsx`; a.click();
+              window.URL.revokeObjectURL(url);
+            } catch { alert('내보내기 오류'); }
+          }}>
+          엑셀 내보내기
+        </button>
         <button className={'btn btn-sm ' + (showForm ? 'btn-danger' : 'btn-success')}
           onClick={() => { setShowForm(!showForm); setMessage(''); }}>
           {showForm ? '✕ 닫기' : '+ 입고 추가'}

@@ -43,7 +43,8 @@ export default function Inventory() {
   const [exporting, setExporting] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  // 컬럼별 필터
+  // 검색 + 컬럼별 필터
+  const [searchText, setSearchText] = useState('');
   const [colFilters, setColFilters] = useState({});
   const [sortBy, setSortBy] = useState('');
   const [sortDir, setSortDir] = useState('desc');
@@ -79,9 +80,17 @@ export default function Inventory() {
 
   useEffect(() => { load(); }, [load]);
 
-  // 컬럼별 필터 적용 (정확 매칭, trim)
+  // 통합 검색 + 컬럼별 필터 적용
   const activeFilters = Object.entries(colFilters).filter(([,v]) => v);
-  const filteredItems = activeFilters.length === 0 ? allItems : allItems.filter(row => {
+  const searchLower = searchText.trim().toLowerCase();
+  const filteredItems = allItems.filter(row => {
+    // 통합 검색
+    if (searchLower) {
+      const haystack = [row.part_number, row.vender, row.family, row.customer, row.sales_person, row.sr_code, row.central, row.did, row.mobis_id, row.site, row.package, row.fab]
+        .map(v => String(v || '').toLowerCase()).join(' ');
+      if (!haystack.includes(searchLower)) return false;
+    }
+    // 컬럼별 필터
     for (const [col, val] of activeFilters) {
       const cellVal = String(row[col] ?? '').trim();
       const filterVal = String(val).trim();
@@ -207,7 +216,11 @@ export default function Inventory() {
 
       <div className="table-container">
         <div className="table-toolbar">
-          <button className="btn btn-sm btn-outline" onClick={() => { setColFilters({}); setPage(1); }}>필터 초기화</button>
+          <input placeholder="검색 (Part#, VENDER, FAMILY, CUSTOMER, SALES...)"
+            value={searchText}
+            onChange={e => { setSearchText(e.target.value); setPage(1); }}
+            style={{ minWidth: 300 }} />
+          <button className="btn btn-sm btn-outline" onClick={() => { setColFilters({}); setSearchText(''); setPage(1); }}>필터 초기화</button>
           {Object.entries(colFilters).filter(([,v]) => v).map(([col, val]) => (
             <span key={col} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 10px', background: '#6c63ff', color: '#fff', borderRadius: 12, fontSize: 12, fontWeight: 600 }}>
               {col}: {val}

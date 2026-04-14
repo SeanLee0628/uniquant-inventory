@@ -11,7 +11,7 @@ const urgencyTooltip = {
 const emptyForm = {
   inbound_date: new Date().toISOString().slice(0, 10),
   sr_number: '', part_number: '', quantity: '',
-  datecode: '', sales_person: '', customer: '',
+  datecode: '', sales_person: '', customer: '', remark: '',
 };
 
 export default function Datecode() {
@@ -142,10 +142,15 @@ export default function Datecode() {
                 <input value={form.sales_person} placeholder="담당자" style={{ width: '100%' }}
                   onChange={e => updateField('sales_person', e.target.value)} />
               </label>
-              <label style={{ gridColumn: '1 / -1' }}>
+              <label>
                 <span style={{ fontSize: 12, color: '#666' }}>CUSTOMER</span>
                 <input value={form.customer} placeholder="고객" style={{ width: '100%' }}
                   onChange={e => updateField('customer', e.target.value)} />
+              </label>
+              <label>
+                <span style={{ fontSize: 12, color: '#666' }}>REMARK</span>
+                <input value={form.remark} placeholder="비고" style={{ width: '100%' }}
+                  onChange={e => updateField('remark', e.target.value)} />
               </label>
               <label style={{ gridColumn: '1 / -1' }}>
                 <button type="submit" className="btn btn-primary" disabled={submitting}

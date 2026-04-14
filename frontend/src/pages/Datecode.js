@@ -111,43 +111,43 @@ export default function Datecode() {
         <div className="table-container" style={{ marginBottom: 16, padding: 16 }}>
           <h3 style={{ margin: '0 0 12px' }}>📦 입고 등록 ({team})</h3>
           <form onSubmit={handleSubmit}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, maxWidth: 500 }}>
               <label>
                 <span style={{ fontSize: 12, color: '#666' }}>입고일 *</span>
-                <input type="date" value={form.inbound_date} required
+                <input type="date" value={form.inbound_date} required style={{ width: '100%' }}
                   onChange={e => updateField('inbound_date', e.target.value)} />
               </label>
               <label>
                 <span style={{ fontSize: 12, color: '#666' }}>SR#</span>
-                <input value={form.sr_number} placeholder="SR#"
+                <input value={form.sr_number} placeholder="SR#" style={{ width: '100%' }}
                   onChange={e => updateField('sr_number', e.target.value)} />
               </label>
               <label>
                 <span style={{ fontSize: 12, color: '#666' }}>Part# *</span>
-                <input value={form.part_number} required placeholder="Part#"
+                <input value={form.part_number} required placeholder="Part#" style={{ width: '100%' }}
                   onChange={e => updateField('part_number', e.target.value)} />
               </label>
               <label>
                 <span style={{ fontSize: 12, color: '#666' }}>Q'ty *</span>
-                <input type="number" value={form.quantity} required placeholder="Q'ty" min="1"
+                <input type="number" value={form.quantity} required placeholder="Q'ty" min="1" style={{ width: '100%' }}
                   onChange={e => updateField('quantity', e.target.value)} />
               </label>
               <label>
                 <span style={{ fontSize: 12, color: '#666' }}>DATECODE</span>
-                <input value={form.datecode} placeholder="예: 202614"
+                <input value={form.datecode} placeholder="예: 202614" style={{ width: '100%' }}
                   onChange={e => updateField('datecode', e.target.value)} />
               </label>
               <label>
                 <span style={{ fontSize: 12, color: '#666' }}>담당 SALES</span>
-                <input value={form.sales_person} placeholder="담당자"
+                <input value={form.sales_person} placeholder="담당자" style={{ width: '100%' }}
                   onChange={e => updateField('sales_person', e.target.value)} />
               </label>
-              <label>
+              <label style={{ gridColumn: '1 / -1' }}>
                 <span style={{ fontSize: 12, color: '#666' }}>CUSTOMER</span>
-                <input value={form.customer} placeholder="고객"
+                <input value={form.customer} placeholder="고객" style={{ width: '100%' }}
                   onChange={e => updateField('customer', e.target.value)} />
               </label>
-              <label style={{ display: 'flex', alignItems: 'flex-end' }}>
+              <label style={{ gridColumn: '1 / -1' }}>
                 <button type="submit" className="btn btn-primary" disabled={submitting}
                   style={{ width: '100%' }}>
                   {submitting ? '등록 중...' : '입고 등록'}

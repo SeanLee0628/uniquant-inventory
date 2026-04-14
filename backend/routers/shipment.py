@@ -403,7 +403,7 @@ def cancel_shipment(shipment_id: int):
                         """UPDATE datecode_inventory
                            SET actual_stock = ?, status = '사용가능',
                                amount_usd = ?, amount_krw = ?,
-                               out_quantity = MAX(0, COALESCE(datecode_inventory.out_quantity, 0) - ?),
+                               out_quantity = GREATEST(0, COALESCE(datecode_inventory.out_quantity, 0) - ?),
                                outbound_date = CASE WHEN COALESCE(datecode_inventory.out_quantity, 0) - ? <= 0 THEN '' ELSE outbound_date END,
                                out_customer = CASE WHEN COALESCE(datecode_inventory.out_quantity, 0) - ? <= 0 THEN '' ELSE out_customer END,
                                out_sales = CASE WHEN COALESCE(datecode_inventory.out_quantity, 0) - ? <= 0 THEN '' ELSE out_sales END
@@ -437,7 +437,7 @@ def cancel_shipment(shipment_id: int):
                     """UPDATE datecode_inventory
                        SET actual_stock = ?, status = '사용가능',
                            amount_usd = ?, amount_krw = ?,
-                           out_quantity = MAX(0, COALESCE(datecode_inventory.out_quantity, 0) - ?),
+                           out_quantity = GREATEST(0, COALESCE(datecode_inventory.out_quantity, 0) - ?),
                            outbound_date = CASE WHEN COALESCE(datecode_inventory.out_quantity, 0) - ? <= 0 THEN '' ELSE outbound_date END,
                            out_customer = CASE WHEN COALESCE(datecode_inventory.out_quantity, 0) - ? <= 0 THEN '' ELSE out_customer END,
                            out_sales = CASE WHEN COALESCE(datecode_inventory.out_quantity, 0) - ? <= 0 THEN '' ELSE out_sales END
@@ -452,7 +452,7 @@ def cancel_shipment(shipment_id: int):
             """UPDATE product_master
                SET current_qty = current_qty + ?,
                    available_qty = current_qty + ? - COALESCE(booking, 0),
-                   total_outbound = MAX(0, total_outbound - ?),
+                   total_outbound = GREATEST(0, total_outbound - ?),
                    updated_at = CURRENT_TIMESTAMP
                WHERE part_number = ?""",
             (quantity, quantity, quantity, part_number),
@@ -469,7 +469,7 @@ def cancel_shipment(shipment_id: int):
                 day = d.day
                 conn.execute(
                     """UPDATE daily_inventory
-                       SET outbound_qty = MAX(0, outbound_qty - ?)
+                       SET outbound_qty = GREATEST(0, outbound_qty - ?)
                        WHERE part_number = ? AND year_month = ? AND day = ?""",
                     (quantity, part_number, ym, day),
                 )

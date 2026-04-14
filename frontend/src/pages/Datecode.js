@@ -30,8 +30,10 @@ export default function Datecode() {
   const [form, setForm] = useState({ ...emptyForm });
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState('');
+  const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
+    setLoading(true);
     try {
       const params = {
         page, page_size: pageSize, sales_team: team,
@@ -42,6 +44,7 @@ export default function Datecode() {
       setItems(res.data.items);
       setTotal(res.data.total);
     } catch { setItems([]); setTotal(0); }
+    finally { setLoading(false); }
   }, [page, pageSize, team, filters]);
 
   useEffect(() => { load(); }, [load]);
@@ -251,7 +254,15 @@ export default function Datecode() {
                 </tr>
               ))}
               {items.length === 0 && (
-                <tr><td colSpan={24} style={{ textAlign: 'center', padding: 40, color: '#aaa' }}>데이터가 없습니다</td></tr>
+                <tr><td colSpan={24} style={{ textAlign: 'center', padding: 40, color: '#aaa' }}>
+                  {loading ? (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+                      <div style={{ width: 24, height: 24, border: '3px solid #e0e0e0', borderTopColor: '#6c63ff', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                      로딩 중...
+                      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+                    </div>
+                  ) : '데이터가 없습니다'}
+                </td></tr>
               )}
             </tbody>
           </table>

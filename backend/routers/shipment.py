@@ -211,7 +211,7 @@ def create_shipment(data: dict):
                    SET actual_stock = ?, status = ?,
                        amount_usd = ?, amount_krw = ?,
                        outbound_date = ?, out_customer = ?,
-                       out_quantity = COALESCE(out_quantity, 0) + ?,
+                       out_quantity = COALESCE(datecode_inventory.out_quantity, 0) + ?,
                        out_sales = ?
                    WHERE id = ?""",
                 (new_stock, new_status, new_amt_usd, new_amt_krw,
@@ -402,10 +402,10 @@ def cancel_shipment(shipment_id: int):
                         """UPDATE datecode_inventory
                            SET actual_stock = ?, status = '사용가능',
                                amount_usd = ?, amount_krw = ?,
-                               out_quantity = MAX(0, COALESCE(out_quantity, 0) - ?),
-                               outbound_date = CASE WHEN COALESCE(out_quantity, 0) - ? <= 0 THEN '' ELSE outbound_date END,
-                               out_customer = CASE WHEN COALESCE(out_quantity, 0) - ? <= 0 THEN '' ELSE out_customer END,
-                               out_sales = CASE WHEN COALESCE(out_quantity, 0) - ? <= 0 THEN '' ELSE out_sales END
+                               out_quantity = MAX(0, COALESCE(datecode_inventory.out_quantity, 0) - ?),
+                               outbound_date = CASE WHEN COALESCE(datecode_inventory.out_quantity, 0) - ? <= 0 THEN '' ELSE outbound_date END,
+                               out_customer = CASE WHEN COALESCE(datecode_inventory.out_quantity, 0) - ? <= 0 THEN '' ELSE out_customer END,
+                               out_sales = CASE WHEN COALESCE(datecode_inventory.out_quantity, 0) - ? <= 0 THEN '' ELSE out_sales END
                            WHERE id = ?""",
                         (new_stock, new_amt_usd, new_amt_krw, restore_qty, restore_qty, restore_qty, restore_qty, dc_id),
                     )
@@ -436,10 +436,10 @@ def cancel_shipment(shipment_id: int):
                     """UPDATE datecode_inventory
                        SET actual_stock = ?, status = '사용가능',
                            amount_usd = ?, amount_krw = ?,
-                           out_quantity = MAX(0, COALESCE(out_quantity, 0) - ?),
-                           outbound_date = CASE WHEN COALESCE(out_quantity, 0) - ? <= 0 THEN '' ELSE outbound_date END,
-                           out_customer = CASE WHEN COALESCE(out_quantity, 0) - ? <= 0 THEN '' ELSE out_customer END,
-                           out_sales = CASE WHEN COALESCE(out_quantity, 0) - ? <= 0 THEN '' ELSE out_sales END
+                           out_quantity = MAX(0, COALESCE(datecode_inventory.out_quantity, 0) - ?),
+                           outbound_date = CASE WHEN COALESCE(datecode_inventory.out_quantity, 0) - ? <= 0 THEN '' ELSE outbound_date END,
+                           out_customer = CASE WHEN COALESCE(datecode_inventory.out_quantity, 0) - ? <= 0 THEN '' ELSE out_customer END,
+                           out_sales = CASE WHEN COALESCE(datecode_inventory.out_quantity, 0) - ? <= 0 THEN '' ELSE out_sales END
                        WHERE id = ?""",
                     (new_stock, new_stock * unit_usd, new_stock * unit_usd * exrate, restore_qty, restore_qty, restore_qty, restore_qty, lot["id"]),
                 )

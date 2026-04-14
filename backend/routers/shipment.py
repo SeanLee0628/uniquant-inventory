@@ -211,11 +211,12 @@ def create_shipment(data: dict):
                    SET actual_stock = ?, status = ?,
                        amount_usd = ?, amount_krw = ?,
                        outbound_date = ?, out_customer = ?,
+                       out_part_number = ?,
                        out_quantity = COALESCE(datecode_inventory.out_quantity, 0) + ?,
                        out_sales = ?
                    WHERE id = ?""",
                 (new_stock, new_status, new_amt_usd, new_amt_krw,
-                 ship_date, customer, alloc, sales_person, lot["id"]),
+                 ship_date, customer, part_number, alloc, sales_person, lot["id"]),
             )
             allocations.append({
                 "datecode_id": lot["id"],
